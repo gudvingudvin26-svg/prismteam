@@ -7,7 +7,8 @@ from django.dispatch import receiver
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=14, blank = True)
+    phone = models.CharField(max_length=13, blank = True, unique=True)
+    jwt_token = models.CharField(max_length=255, blank = True)
 
     def __str__(self):
         return self.username
@@ -23,3 +24,5 @@ class Profile(models.Model):
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
+
+
