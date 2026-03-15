@@ -70,8 +70,8 @@ class Question(models.Model):
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
 
     class Meta:
-        """Метаданные модели: сортировка по полю 'order'."""
-        ordering = ['order']
+        """Метаданные модели: сортировка сначала по полю 'quiz', затем по полю 'order'."""
+        ordering = ['quiz', 'order']
 
     def __str__(self):
         """Возвращает строковое представление вопроса."""
