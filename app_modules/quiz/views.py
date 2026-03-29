@@ -1,14 +1,20 @@
-from django.shortcuts import render
+from urllib import request
+
+from django.shortcuts import render, redirect
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.contrib.auth import logout, login
 
 from config import settings
 from .serializers import UserSerializer
 import jwt
 from datetime import datetime, timedelta
+import logging
 
 from .models import User
+
+logger = logging.getLogger('reg-log_logger')
 
 class UserRegistration(APIView):
 
@@ -24,6 +30,8 @@ class UserRegistration(APIView):
                                     user = serializer.save()
                                     user.jwt_token = jwt.encode({'sub': user.id, 'exp': datetime.now() + timedelta(hours=1), 'name': user.username, 'email': user.email}, key = settings.SECRET_KEY) #Присвоение юзеру jwt-токен
                                     user.save()
+                                    login(request, user)
+                                    logger.info(f'User registered with username {user.username} successfully')
                                     return render(request, 'main.html')
                                 else:
                                     return Response('Username cannot include "@" to avoid errors', status=status.HTTP_400_BAD_REQUEST)
@@ -37,10 +45,13 @@ class UserRegistration(APIView):
                     return Response('Phone number can contain only a numbers', status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response('You forgot to create a password', status=status.HTTP_400_BAD_REQUEST)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
     def get(self, request):
+        if request.user.is_authenticated:
+            return render(request, 'main.html')
         return render(request, 'registration.html')
 
 
@@ -48,9 +59,6 @@ class UserRegistration(APIView):
 class UserLogin(APIView):
 
     def post(self, request):
-        # serializer = UserSerializer(data=request.data, login =True)
-        # if serializer.is_valid():
-        #     ghost_user = serializer.save()
 
             if request.data['identification_parameter'].isdigit(): # Поиск юзера с заданным именем/почтой/номером телефона
                 user = User.objects.filter(phone=request.data['identification_parameter']).first()
@@ -65,10 +73,39 @@ class UserLogin(APIView):
                 if user.password == request.data['password']:
                     user.jwt_token = jwt.encode({'sub': user.id, 'exp': datetime.now() + timedelta(hours=1), 'name': user.username, 'email': user.email}, key = settings.SECRET_KEY)
                     user.save()
+                    login(request, user)
+                    logging.info(f'User logged in with username {user.username} successfully')
                     return render(request, 'main.html')
                 else:
                     return Response('Wrong password', status=status.HTTP_400_BAD_REQUEST)
 
 
     def get(self, request):
+        if request.user.is_authenticated:
+            return render(request, 'main.html')
+        else:
+            return render(request, 'login.html')
+
+class Main(APIView):
+    def get(self, request):
+        return render(request, 'main.html')
+
+class UserLogout(APIView):
+    def post(self, request):
+        if request.user.is_authenticated:
+            request.user.jwt_token = ''
+            request.user.save()
+        else:
+            return render(request, 'main.html')
+        if request.user.jwt_token == '':
+            name = request.user.username
+            logout(request)
+            if request.user.is_authenticated:
+                logger.info(f'User can not log out with username {name} successfully')
+                return render(request, 'main.html')
+            else:
+                logger.info(f'User logged out with username {name} successfully')
+
         return render(request, 'login.html')
+    def get(self, request):
+        return render(request, 'main.html')
