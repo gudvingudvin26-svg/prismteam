@@ -4,7 +4,8 @@ interface QuestionFormProps {
   question: {
     id: string;
     text: string;
-    options: { text: string; isCorrect: boolean }[];
+    order: number;
+    options: { text: string; is_correct: boolean }[];
   };
   index: number;
   onChange: (updated: any) => void;
@@ -18,7 +19,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ question, index, onChange, 
     const newErrors: { text?: string; options?: string } = {};
     if (!question.text.trim()) newErrors.text = 'Текст вопроса обязателен';
     if (question.options.some(opt => !opt.text.trim())) newErrors.options = 'Все варианты должны быть заполнены';
-    if (!question.options.some(opt => opt.isCorrect)) newErrors.options = 'Выберите правильный ответ';
+    if (!question.options.some(opt => opt.is_correct)) newErrors.options = 'Выберите правильный ответ';
     return newErrors;
   };
 
@@ -29,7 +30,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ question, index, onChange, 
   const addOption = () => {
     onChange({
       ...question,
-      options: [...question.options, { text: '', isCorrect: false }]
+      options: [...question.options, { text: '', is_correct: false }]
     });
   };
 
@@ -40,7 +41,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ question, index, onChange, 
         <button
           type="button"
           onClick={onDelete}
-          className="px-2 py-1 bg-red-500 text-white rounded"
+          className="px-2 py-1 bg-red-500 text-white rounded text-sm"
         >
           Удалить
         </button>
@@ -64,11 +65,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ question, index, onChange, 
             <input
               type="radio"
               name={`correct-${question.id}`}
-              checked={option.isCorrect}
+              checked={option.is_correct}
               onChange={() => {
                 const newOptions = [...question.options];
-                newOptions.forEach((_, i) => newOptions[i].isCorrect = false);
-                newOptions[optIndex].isCorrect = true;
+                newOptions.forEach((_, i) => newOptions[i].is_correct = false);
+                newOptions[optIndex].is_correct = true;
                 onChange({ ...question, options: newOptions });
               }}
               className="mr-2"

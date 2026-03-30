@@ -1,42 +1,81 @@
 import React, { useState } from 'react';
 import QuestionForm from './QuestionForm';
+import { quizzesApi } from '../../services/api/quizzes';
 
-interface Question {
+interface QuestionType {
   id: string;
   text: string;
-  options: { text: string; isCorrect: boolean }[];
+  order: number;
+  options: { text: string; is_correct: boolean }[];
 }
 
 const CreateQuiz: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<QuestionType[]>([]);
   const [errors, setErrors] = useState<{ title?: string; questions?: string }>({});
+  const [loading, setLoading] = useState(false);
 
   const validate = () => {
     const newErrors: { title?: string; questions?: string } = {};
     if (!title.trim()) newErrors.title = 'Название обязательно';
     if (questions.length === 0) newErrors.questions = 'Добавьте хотя бы один вопрос';
+    for (const q of questions) {
+      if (!q.text.trim()) {
+        newErrors.questions = 'Все вопросы должны быть заполнены';
+        break;
+      }
+      if (q.options.some(opt => !opt.text.trim())) {
+        newErrors.questions = 'Все варианты ответов должны быть заполнены';
+        break;
+      }
+      if (!q.options.some(opt => opt.is_correct)) {
+        newErrors.questions = 'В каждом вопросе должен быть выбран правильный ответ';
+        break;
+      }
+    }
     return newErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
     }
-    console.log({ title, description, questions });
+
+    setLoading(true);
+    try {
+      const response = await quizzesApi.createQuiz({ title, description });
+      const quizId = response.data.id;
+
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        await quizzesApi.createQuestion(quizId, {
+          text: q.text,
+          order: i + 1,
+          answers: q.options
+        });
+      }
+
+      window.location.href = '/quizzes';
+    } catch (error) {
+      console.error('Ошибка создания квиза:', error);
+      alert('Ошибка при создании квиза');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const addQuestion = () => {
-    const newQuestion: Question = {
+    const newQuestion: QuestionType = {
       id: Date.now().toString(),
       text: '',
+      order: questions.length + 1,
       options: [
-        { text: '', isCorrect: false },
-        { text: '', isCorrect: false }
+        { text: '', is_correct: false },
+        { text: '', is_correct: false }
       ]
     };
     setQuestions([...questions, newQuestion]);
@@ -89,6 +128,7 @@ const CreateQuiz: React.FC = () => {
             type="button"
             onClick={addQuestion}
             className="px-4 py-2 bg-gray-500 text-white rounded"
+            disabled={loading}
           >
             + Добавить вопрос
           </button>
@@ -96,9 +136,10 @@ const CreateQuiz: React.FC = () => {
 
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-500 text-white rounded"
+          disabled={loading}
+          className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
         >
-          Создать квиз
+          {loading ? 'Создание...' : 'Создать квиз'}
         </button>
       </form>
     </div>

@@ -1,26 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { sessionsApi } from '../../services/api/sessions';
 
 interface Result {
-  id: string;
-  participantName: string;
+  id: number;
+  participant_name: string;
   score: number;
-  totalQuestions: number;
-  completedAt: string;
+  total_questions: number;
+  completed_at: string;
 }
 
-const ResultsTable: React.FC = () => {
-  const [results, setResults] = useState<Result[]>([
-    { id: '1', participantName: 'Иван Петров', score: 8, totalQuestions: 10, completedAt: '2024-03-15 14:30' },
-    { id: '2', participantName: 'Мария Сидорова', score: 9, totalQuestions: 10, completedAt: '2024-03-15 15:45' },
-    { id: '3', participantName: 'Алексей Иванов', score: 7, totalQuestions: 10, completedAt: '2024-03-16 10:20' },
-    { id: '4', participantName: 'Елена Петрова', score: 10, totalQuestions: 10, completedAt: '2024-03-16 11:15' },
-    { id: '5', participantName: 'Дмитрий Соколов', score: 6, totalQuestions: 10, completedAt: '2024-03-17 09:45' }
-  ]);
+interface ResultsTableProps {
+  sessionId: number;
+}
 
-  const [sortField, setSortField] = useState<'score' | 'participantName' | 'completedAt'>('score');
+const ResultsTable: React.FC<ResultsTableProps> = ({ sessionId }) => {
+  const [results, setResults] = useState<Result[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortField, setSortField] = useState<'score' | 'participant_name' | 'completed_at'>('score');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  const handleSort = (field: 'score' | 'participantName' | 'completedAt') => {
+  useEffect(() => {
+    loadResults();
+  }, [sessionId]);
+
+  const loadResults = async () => {
+    try {
+      const response = await sessionsApi.getResults(sessionId);
+      setResults(response.data);
+    } catch (error) {
+      console.error('Ошибка загрузки результатов:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSort = (field: 'score' | 'participant_name' | 'completed_at') => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -33,10 +47,10 @@ const ResultsTable: React.FC = () => {
     let comparison = 0;
     if (sortField === 'score') {
       comparison = a.score - b.score;
-    } else if (sortField === 'participantName') {
-      comparison = a.participantName.localeCompare(b.participantName);
+    } else if (sortField === 'participant_name') {
+      comparison = a.participant_name.localeCompare(b.participant_name);
     } else {
-      comparison = new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime();
+      comparison = new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime();
     }
     return sortDirection === 'asc' ? comparison : -comparison;
   });
@@ -44,11 +58,11 @@ const ResultsTable: React.FC = () => {
   const exportToCSV = () => {
     const headers = ['Участник', 'Баллы', 'Всего вопросов', 'Процент', 'Дата завершения'];
     const data = sortedResults.map(r => [
-      r.participantName,
+      r.participant_name,
       r.score.toString(),
-      r.totalQuestions.toString(),
-      `${Math.round((r.score / r.totalQuestions) * 100)}%`,
-      r.completedAt
+      r.total_questions.toString(),
+      `${Math.round((r.score / r.total_questions) * 100)}%`,
+      new Date(r.completed_at).toLocaleString()
     ]);
 
     const csv = [headers, ...data].map(row => row.join(',')).join('\n');
@@ -56,7 +70,7 @@ const ResultsTable: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'results.csv');
+    link.setAttribute('download', `results_session_${sessionId}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -67,6 +81,14 @@ const ResultsTable: React.FC = () => {
     if (sortField !== field) return ' ↕️';
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
+
+  if (loading) {
+    return <div className="p-6 text-center">Загрузка результатов...</div>;
+  }
+
+  if (results.length === 0) {
+    return <div className="p-6 text-center text-gray-500">Нет результатов</div>;
+  }
 
   return (
     <div className="p-6">
@@ -86,9 +108,9 @@ const ResultsTable: React.FC = () => {
             <tr className="bg-gray-100 border-b">
               <th
                 className="px-6 py-3 text-left text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                onClick={() => handleSort('participantName')}
+                onClick={() => handleSort('participant_name')}
               >
-                Участник{getSortIcon('participantName')}
+                Участник{getSortIcon('participant_name')}
               </th>
               <th
                 className="px-6 py-3 text-left text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
@@ -104,16 +126,16 @@ const ResultsTable: React.FC = () => {
               </th>
               <th
                 className="px-6 py-3 text-left text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-200"
-                onClick={() => handleSort('completedAt')}
+                onClick={() => handleSort('completed_at')}
               >
-                Дата завершения{getSortIcon('completedAt')}
+                Дата завершения{getSortIcon('completed_at')}
               </th>
-            </tr>
+             </tr>
           </thead>
           <tbody>
             {sortedResults.map((result) => (
               <tr key={result.id} className="border-b hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium">{result.participantName}</td>
+                <td className="px-6 py-4 font-medium">{result.participant_name}</td>
                 <td className="px-6 py-4">
                   <span className={`font-bold ${
                     result.score >= 8 ? 'text-green-600' :
@@ -122,19 +144,21 @@ const ResultsTable: React.FC = () => {
                     {result.score}
                   </span>
                 </td>
-                <td className="px-6 py-4">{result.totalQuestions}</td>
+                <td className="px-6 py-4">{result.total_questions}</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center">
                     <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                       <div
                         className="bg-blue-500 rounded-full h-2"
-                        style={{ width: `${(result.score / result.totalQuestions) * 100}%` }}
+                        style={{ width: `${(result.score / result.total_questions) * 100}%` }}
                       ></div>
                     </div>
-                    <span>{Math.round((result.score / result.totalQuestions) * 100)}%</span>
+                    <span>{Math.round((result.score / result.total_questions) * 100)}%</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-gray-500">{result.completedAt}</td>
+                <td className="px-6 py-4 text-gray-500">
+                  {new Date(result.completed_at).toLocaleString()}
+                </td>
               </tr>
             ))}
           </tbody>
