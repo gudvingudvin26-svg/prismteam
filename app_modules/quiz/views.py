@@ -96,16 +96,16 @@ class UserLogout(APIView):
             request.user.jwt_token = ''
             request.user.save()
         else:
-            return render(request, 'main.html')
+            return redirect('http://127.0.0.1:8000/main/')
         if request.user.jwt_token == '':
             name = request.user.username
             logout(request)
             if request.user.is_authenticated:
                 logger.info(f'User can not log out with username {name} successfully')
-                return render(request, 'main.html')
+                return redirect('http://127.0.0.1:8000/main/')
             else:
                 logger.info(f'User logged out with username {name} successfully')
 
-        return render(request, 'login.html')
+        return redirect('http://127.0.0.1:8000/login/')
     def get(self, request):
-        return render(request, 'main.html')
+        return redirect('http://127.0.0.1:8000/main/')
