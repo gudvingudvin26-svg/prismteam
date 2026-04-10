@@ -22,7 +22,7 @@ from app_modules.quiz.views import QuizViewSet, QuestionViewSet, AnswerOptionVie
 router = DefaultRouter()
 router.register(r'quizzes', QuizViewSet, basename='quiz')
 router.register(r'questions', QuestionViewSet, basename='question')
-router.register(r'answers', AnswerOptionViewSet, basename='answer')
+router.register(r'answers', AnswerOptionViewSet, basename='answerooption')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

@@ -1,5 +1,10 @@
+"""Административная панель для моделей викторин, вопросов и вариантов ответов."""
+
 from django.contrib import admin
-from .models import Quiz, Question, AnswerOption
+from django.core.exceptions import ValidationError
+from django.forms.models import BaseInlineFormSet
+
+from .models import AnswerOption, Question, Quiz
 
 
 class AnswerOptionInline(admin.TabularInline):
@@ -20,12 +25,27 @@ class QuestionAdmin(admin.ModelAdmin):
     search_fields = ('text',)
 
 
+class QuestionInlineFormSet(BaseInlineFormSet):
+    """Кастомный FormSet для валидации вопросов в админ-панели викторины."""
+
+    def clean(self):
+        """Проверка, что в админке добавлен хотя бы один вопрос."""
+        super().clean()
+        # Проверяем формы, которые не помечены на удаление
+        valid_forms = [
+            form for form in self.forms
+            if form.cleaned_data and not form.cleaned_data.get('DELETE', False)
+        ]
+        if len(valid_forms) < 1:
+            raise ValidationError("Квиз должен содержать хотя бы один вопрос.")
+
+
 class QuestionInline(admin.StackedInline):
-    """
-    Inline-форма для добавления вопросов на странице редактирования викторины.
-    """
+    """Inline-форма для добавления вопросов на странице редактирования викторины."""
     model = Question
+    formset = QuestionInlineFormSet  # Подключаем нашу проверку
     extra = 1
+    min_num = 1  # Указывает админке, что поле обязательно (визуально)
     show_change_link = True
 
 

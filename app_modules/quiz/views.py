@@ -1,7 +1,15 @@
-from rest_framework import viewsets, permissions
+"""ViewSet'ы для управления викторинами, вопросами и вариантами ответов."""
+
 from django.db.models import Prefetch
+
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
+
 from .models import Quiz, Question, AnswerOption
 from .serializers import QuizSerializer, QuestionSerializer, AnswerOptionSerializer
+from .validators import validate_quiz_integrity
 
 
 class QuizViewSet(viewsets.ModelViewSet):
@@ -25,6 +33,27 @@ class QuizViewSet(viewsets.ModelViewSet):
                 queryset=Question.objects.select_related('quiz').prefetch_related('answer_options')
             )
         ).select_related('created_by').order_by('-id')
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def publish(self, request, pk=None):
+        """
+        Метод для финальной публикации квиза.
+        Запускает проверку целостности всех вопросов и ответов.
+        """
+        quiz = self.get_object()
+
+        try:
+            validate_quiz_integrity(quiz, use_drf_exception=True)
+
+            # Если в модели Quiz появится поле status/is_published, обновляем его здесь:
+            # quiz.is_published = True
+            # quiz.save()
+
+            return Response({"status": "Квиз успешно прошел валидацию и готов к публикации."},
+                            status=status.HTTP_200_OK)
+
+        except ValidationError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
         """Сохраняет викторину, автоматически устанавливая текущего пользователя создателем."""

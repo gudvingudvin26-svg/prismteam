@@ -1,30 +1,19 @@
-import random
-import string
+"""Модели для приложения викторин."""
+
+import secrets
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import MinLengthValidator
+from django.core.exceptions import ValidationError
 
 
-def generate_access_token(length=16):
-    """
-    Генерирует случайный токен из латинских букв, цифр и специальных символов.
-
-    Args:
-        length (int): Длина токена (по умолчанию 16 символа).
-
-    Returns:
-        str: Случайно сгенерированный токен.
-    """
-    chars = string.ascii_letters + string.digits + "!@#$%^&*()_+-=[]{}|;:,.<>?"
-    return ''.join(random.choice(chars) for _ in range(length))
-
-
-def generate_default_token():
+def generate_token():
     """
     Вспомогательная функция для генерации токена по умолчанию.
 
     Используется в поле access_token модели Quiz.
     """
-    return generate_access_token(16)
+    return secrets.token_urlsafe(16)[:16]
 
 
 class Quiz(models.Model):
@@ -45,7 +34,7 @@ class Quiz(models.Model):
     access_token = models.CharField(
         max_length=64,
         unique=True,
-        default=generate_default_token,
+        default=generate_token,
         verbose_name="Токен доступа"
     )
 
@@ -66,12 +55,22 @@ class Question(models.Model):
         related_name='questions',
         verbose_name="Викторина"
     )
-    text = models.TextField(verbose_name="Текст вопроса")
+    text = models.TextField(
+        verbose_name="Текст вопроса",
+        validators=[MinLengthValidator(5, message="Вопрос слишком короткий (минимум 5 символов)")],
+        blank=False,
+        null=False
+    )
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
 
     class Meta:
         """Метаданные модели: сортировка сначала по полю 'quiz', затем по полю 'order'."""
         ordering = ['quiz', 'order']
+
+    def clean(self):
+        """Проверяет, что текст вопроса не состоит только из пробелов."""
+        if self.text and not self.text.strip():
+            raise ValidationError({'text': "Текст вопроса не может состоять только из пробелов."})
 
     def __str__(self):
         """Возвращает строковое представление вопроса."""
