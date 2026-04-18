@@ -4,6 +4,7 @@ stages:
   - lint
   - test
   - build
+  - docs
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -12,6 +13,23 @@ cache:
   paths:
     - .cache/pip
     - venv/
+
+docs:
+  stage: docs
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install sphinx sphinx-autodoc-typehints sphinx_rtd_theme
+  script:
+    - cd docs
+#    - sphinx-apidoc -o source/../backend
+    - make html
+  artifacts:
+    paths:
+      - docs/build/html/
+    expire_in: 1 month
+  only:
+    - main
 
 lint:
   stage: lint
