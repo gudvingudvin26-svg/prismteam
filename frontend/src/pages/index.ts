@@ -1,1 +1,9 @@
-﻿// Export pages here
+﻿export { default as Home } from './Home';
+export { default as Login } from './Login';
+export { default as Register } from './Register';
+export { default as Dashboard } from './Dashboard';
+export { default as JoinQuiz } from './JoinQuiz';
+export { default as QuizSession } from './QuizSession';
+export { default as Results } from './Results';
+export { default as QuizList } from './organizer/QuizList';
+export { default as CreateQuiz } from './organizer/CreateQuiz';
