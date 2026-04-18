@@ -1,22 +1,18 @@
 image: python:3.11
 
-# Этапы пайплайна
 stages:
   - lint
   - test
   - build
 
-# Переменные окружения (опционально)
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
-# Кэширование зависимостей для ускорения
 cache:
   paths:
     - .cache/pip
     - venv/
 
-# Job для линтинга (PEP8)
 lint:
   stage: lint
   before_script:
@@ -24,11 +20,10 @@ lint:
     - source venv/bin/activate
     - pip install flake8
   script:
-    - flake8 . --max-line-length=120   # можно настроить параметры
+    - flake8 . --max-line-length=120
   only:
-    - main                            # или branches: - main, но для push на любую ветку можно убрать
+    - main
 
-# Job для тестирования с проверкой покрытия
 test:
   stage: test
   before_script:
@@ -37,17 +32,15 @@ test:
     - pip install pytest pytest-cov
     - if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
   script:
-    # Запуск pytest с измерением покрытия. Укажите нужную папку с кодом (например, my_package или .)
     - pytest --cov=my_package --cov-report=term --cov-report=html
   coverage: '/TOTAL.*\s+(\d+%)$/'
   artifacts:
     paths:
-      - htmlcov/                  # сохраняем HTML-отчёт как артефакт
+      - htmlcov/
     expire_in: 1 week
   only:
     - main
 
-# Job для сборки (пример: упаковка приложения)
 build:
   stage: build
   before_script:
@@ -55,7 +48,7 @@ build:
     - source venv/bin/activate
     - pip install build
   script:
-    - python -m build   # собирает .tar.gz и .whl в dist/
+    - python -m build
   artifacts:
     paths:
       - dist/
