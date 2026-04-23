@@ -77,6 +77,10 @@ CHANNEL_LAYERS = {
     }
 }
 
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
+REDIS_DB = 0
+
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
