@@ -4,8 +4,9 @@ import time
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from channels.consumer import AsyncConsumer
+from config.logging_config import get_logger
 
-logger = logging.getLogger('ws')
+logger = get_logger('ws')
 
 
 class WSReconnectMiddleware(BaseMiddleware):
