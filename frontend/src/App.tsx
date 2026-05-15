@@ -9,6 +9,7 @@ import QuizSession from './pages/QuizSession';
 import Results from './pages/Results';
 import QuizList from './pages/organizer/QuizList';
 import CreateQuiz from './pages/organizer/CreateQuiz';
+import Stats from './pages/Stats';
 
 function App() {
   return (
@@ -54,6 +55,15 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/stats/:sessionId"
+          element={
+            <PrivateRoute>
+              <Stats />
+            </PrivateRoute>
+          }
+        />
+        <Route path="*" element={<div className="p-6 text-center">404 - Страница не найдена</div>} />
       </Routes>
     </BrowserRouter>
   );
