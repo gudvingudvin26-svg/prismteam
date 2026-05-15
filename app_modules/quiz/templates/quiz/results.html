@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты игры</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'quiz/css/style.css' %}">
+</head>
+<body>
+    <div class="results-container">
+        <h1 class="results-title">🎮 Игра завершена!</h1>
+
+        <div class="score-block">
+            <div class="score-circle">
+                <span class="score-value">{{ session.score }}</span>
+                <span class="score-label">баллов</span>
+            </div>
+        </div>
+
+        <div class="place-block">
+            <h2>Ваше место: <span id="user-place">#{{ place }}</span></h2>
+        </div>
+
+        <div class="leaderboard">
+            <h2>🏆 Таблица лидеров</h2>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Место</th>
+                        <th>Имя</th>
+                        <th>Баллы</th>
+                        <th>Время</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for leader in leaderboard %}
+                    <tr class="{% if leader.id == session.id %}current-user{% endif %}">
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ leader.participant_name }}</td>
+                        <td>{{ leader.score }}</td>
+                        <td>{{ leader.finished_at|date:"H:i:s" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <a href="/" class="play-again-btn">🔄 Играть снова</a>
+    </div>
+
+    <script src="{% static 'quiz/js/results.js' %}"></script>
+</body>
+</html>
