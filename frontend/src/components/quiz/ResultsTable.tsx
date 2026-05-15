@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { sessionsApi } from '../../services/api/sessions';
-
+import { sessionsApi } from "../../api/sessions";
 interface Result {
   id: number;
   participant_name: string;
