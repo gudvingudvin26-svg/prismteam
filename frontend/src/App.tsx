@@ -1,4 +1,12 @@
-﻿import Results from './pages/Results';
+﻿import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import PrivateRoute from './components/PrivateRoute';
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import JoinQuiz from './pages/JoinQuiz';
+import QuizSession from './pages/QuizSession';
+import Results from './pages/Results';
 import QuizList from './pages/organizer/QuizList';
 import CreateQuiz from './pages/organizer/CreateQuiz';
 import Stats from './pages/Stats';
