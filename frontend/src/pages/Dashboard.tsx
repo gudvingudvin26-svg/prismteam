@@ -67,7 +67,7 @@ const Dashboard: React.FC = () => {
             <Link to="/dashboard" className="block px-4 py-2 rounded hover:bg-blue-50 text-blue-600">Обзор</Link>
             <Link to="/quizzes" className="block px-4 py-2 rounded hover:bg-blue-50">Квизы</Link>
             <Link to="/quizzes/create" className="block px-4 py-2 rounded hover:bg-blue-50">Создать</Link>
-            <Link to="/stats" className="block px-4 py-2 rounded hover:bg-blue-50">Статистика</Link>
+            <Link to="/stats/:sessionId" className="block px-4 py-2 rounded hover:bg-blue-50">Статистика</Link>
           </nav>
         </aside>
 
