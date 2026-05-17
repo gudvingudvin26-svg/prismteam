@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+
+from app_modules.quiz.log_filters import OnlyInfoFilter
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'app_modules.quiz',
 ]
 
@@ -99,6 +103,34 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {
+            "format": '{asctime} - {levelname} - {message}',
+            "style": "{",
+        }
+    },
+    "filters": {
+        "only_info": {
+            "()": OnlyInfoFilter,
+        }
+    },
+    "handlers": {
+        "file": {
+            "level": "INFO",
+            "filters": ["only_info"],
+            "class": "logging.FileHandler",
+            "formatter": "simple",
+            "filename": "app_modules/quiz/quiz.log",
+        },
+    },
+    'root': {
+        'handlers': ['file'],
+        'level': 'INFO',
+    }
+}
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
@@ -116,3 +148,5 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+AUTH_USER_MODEL = 'quiz.User'
