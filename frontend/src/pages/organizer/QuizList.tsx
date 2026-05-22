@@ -1,0 +1,106 @@
+/**
+ * @fileoverview Список квизов организатора с возможностью запуска, редактирования, удаления и просмотра статистики.
+ */
+
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Button, Card, Modal } from '../../components/ui';
+import { quizzesApi, sessionsApi } from '../../api';
+import { Quiz } from '../../types';
+
+const QuizList: React.FC = () => {
+  const navigate = useNavigate();
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [sessionCode, setSessionCode] = useState('');
+  const [selectedQuizId, setSelectedQuizId] = useState<number | null>(null);
+
+  useEffect(() => {
+    loadQuizzes();
+  }, []);
+
+  const loadQuizzes = async () => {
+    try {
+      const res = await quizzesApi.getMyQuizzes();
+      setQuizzes(res.data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('Удалить квиз? Все связанные сессии и ответы будут удалены.')) {
+      await quizzesApi.deleteQuiz(id);
+      await loadQuizzes();
+    }
+  };
+
+  const handleRun = async (quizId: number) => {
+    try {
+      const res = await sessionsApi.createSession(quizId);
+      setSessionCode(res.data.code);
+      setSelectedQuizId(quizId);
+      setModalOpen(true);
+    } catch (error) {
+      alert('Не удалось создать сессию');
+    }
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSessionCode('');
+    setSelectedQuizId(null);
+  };
+
+  if (loading) return <div className="p-8 text-center">Загрузка...</div>;
+
+  return (
+    <div className="max-w-6xl mx-auto py-8 px-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Мои квизы</h1>
+        <Link to="/quizzes/create">
+          <Button variant="primary">Создать новый квиз</Button>
+        </Link>
+      </div>
+
+      {quizzes.length === 0 ? (
+        <Card className="p-8 text-center text-gray-500">
+          У вас пока нет квизов. Нажмите «Создать новый квиз».
+        </Card>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-6">
+          {quizzes.map((quiz) => (
+            <Card key={quiz.id} className="p-5">
+              <h3 className="text-xl font-semibold mb-2">{quiz.title}</h3>
+              <p className="text-gray-600 mb-4">{quiz.description}</p>
+              <div className="text-sm text-gray-500 mb-4">
+                Создан: {new Date(quiz.created_at).toLocaleDateString()}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="primary" onClick={() => handleRun(quiz.id)}>Запустить</Button>
+                <Button size="sm" variant="outline" onClick={() => navigate(`/quizzes/${quiz.id}/edit`)}>Редактировать</Button>
+                <Button size="sm" variant="danger" onClick={() => handleDelete(quiz.id)}>Удалить</Button>
+                <Button size="sm" variant="outline" onClick={() => navigate(`/results/quiz/${quiz.id}`)}>Статистика</Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Modal isOpen={modalOpen} onClose={closeModal} title="Сессия создана">
+        <p className="mb-4">Код для участников:</p>
+        <p className="text-3xl font-bold text-center text-blue-600 mb-6">{sessionCode}</p>
+        <p className="text-sm text-gray-500">Сообщите код участникам, чтобы они могли присоединиться.</p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="outline" onClick={closeModal}>Закрыть</Button>
+          <Button variant="primary" onClick={() => navigate(`/play/${selectedQuizId}`)}>Начать игру</Button>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+export default QuizList;
