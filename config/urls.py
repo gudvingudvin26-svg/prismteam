@@ -4,7 +4,8 @@ from rest_framework.routers import DefaultRouter
 
 from app_modules.quiz.views import (
     UserRegistration, UserLogin, UserLogout, Main,
-    QuizViewSet, QuestionViewSet, AnswerOptionViewSet
+    QuizViewSet, QuestionViewSet, AnswerOptionViewSet,
+    UserRegistrationAPI, UserLoginAPI
 )
 
 router = DefaultRouter()
@@ -14,11 +15,13 @@ router.register(r'answers', AnswerOptionViewSet, basename='answerooption')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Auth routes
     path('registration/', UserRegistration.as_view(), name='registration'),
     path('login/', UserLogin.as_view(), name='login'),
     path('main/', Main.as_view(), name='main'),
     path('logout/', UserLogout.as_view(), name='logout'),
-    # Quiz API routes
+
+    path('auth/register/', UserRegistrationAPI.as_view(), name='auth_register'),
+    path('auth/login/', UserLoginAPI.as_view(), name='auth_login'),  # ← добавить
+    path('api/auth/register/', UserRegistrationAPI.as_view(), name='api_register'),
     path('api/organizer/', include(router.urls)),
 ]

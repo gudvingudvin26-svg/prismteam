@@ -50,7 +50,6 @@ const Login: React.FC = () => {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="example@mail.com"
             required
-            autoComplete="email"
           />
           <Input
             label="Пароль"
@@ -59,7 +58,6 @@ const Login: React.FC = () => {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             required
-            autoComplete="current-password"
           />
 
           {error && (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { sessionsApi } from "../../api/sessions";
+import { sessionsApi } from '../../api/sessions';
+
 interface Result {
   id: number;
   participant_name: string;
@@ -81,18 +82,16 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ sessionId }) => {
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
-  if (loading) {
-    return <div className="p-6 text-center">Загрузка результатов...</div>;
-  }
+  if (loading) return <div className="text-center text-white py-8">Загрузка...</div>;
 
   if (results.length === 0) {
-    return <div className="p-6 text-center text-gray-500">Нет результатов</div>;
+    return <div className="p-6 text-center text-gray-600">Нет результатов</div>;
   }
 
   return (
-    <div className="p-6">
+    <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Результаты участников</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Результаты участников</h2>
         <button
           onClick={exportToCSV}
           className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
@@ -129,12 +128,12 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ sessionId }) => {
               >
                 Дата завершения{getSortIcon('completed_at')}
               </th>
-             </tr>
+            </tr>
           </thead>
           <tbody>
             {sortedResults.map((result) => (
               <tr key={result.id} className="border-b hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium">{result.participant_name}</td>
+                <td className="px-6 py-4 font-medium text-gray-900">{result.participant_name}</td>
                 <td className="px-6 py-4">
                   <span className={`font-bold ${
                     result.score >= 8 ? 'text-green-600' :
@@ -143,7 +142,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ sessionId }) => {
                     {result.score}
                   </span>
                 </td>
-                <td className="px-6 py-4">{result.total_questions}</td>
+                <td className="px-6 py-4 text-gray-700">{result.total_questions}</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center">
                     <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
@@ -152,7 +151,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ sessionId }) => {
                         style={{ width: `${(result.score / result.total_questions) * 100}%` }}
                       ></div>
                     </div>
-                    <span>{Math.round((result.score / result.total_questions) * 100)}%</span>
+                    <span className="text-gray-700">{Math.round((result.score / result.total_questions) * 100)}%</span>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-gray-500">

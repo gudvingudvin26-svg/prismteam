@@ -169,3 +169,103 @@ class AnswerOptionViewSet(viewsets.ModelViewSet):
         return AnswerOption.objects.filter(
             question__quiz__created_by=user
         ).select_related('question__quiz')
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
+class UserRegistrationAPI(APIView):
+    def post(self, request):
+        print("=== REGISTRATION REQUEST ===")
+        print("Request data:", request.data)
+        print("Request data type:", type(request.data))
+
+        serializer = UserSerializer(data=request.data)
+        print("Serializer is valid:", serializer.is_valid())
+        if not serializer.is_valid():
+            print("Serializer errors:", serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        username = request.data.get('username')
+        email = request.data.get('email')
+        password = request.data.get('password')
+        again_password = request.data.get('again_password')
+
+        if not username:
+            return Response({'error': 'Username required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not email:
+            return Response({'error': 'Email required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not password:
+            return Response({'error': 'Password required'}, status=status.HTTP_400_BAD_REQUEST)
+        if password != again_password:
+            return Response({'error': 'Passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(password) < 6:
+            return Response({'error': 'Password must be at least 6 characters'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        user.set_password(password)
+        user.save()
+
+        from datetime import datetime, timedelta
+        import jwt
+        from config import settings
+
+        access_token = jwt.encode(
+            {'sub': user.id, 'exp': datetime.now() + timedelta(hours=1), 'name': user.username, 'email': user.email},
+            key=settings.SECRET_KEY
+        )
+        refresh_token = jwt.encode(
+            {'sub': user.id, 'exp': datetime.now() + timedelta(days=7)},
+            key=settings.SECRET_KEY
+        )
+
+        return Response({
+            'access': access_token,
+            'refresh': refresh_token,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name
+            }
+        }, status=status.HTTP_201_CREATED)
+class UserLoginAPI(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        if not email or not password:
+            return Response({'error': 'Email and password required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.check_password(password):
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        from datetime import datetime, timedelta
+        import jwt
+        from config import settings
+
+        access_token = jwt.encode(
+            {'sub': user.id, 'exp': datetime.now() + timedelta(hours=1), 'name': user.username, 'email': user.email},
+            key=settings.SECRET_KEY
+        )
+        refresh_token = jwt.encode(
+            {'sub': user.id, 'exp': datetime.now() + timedelta(days=7)},
+            key=settings.SECRET_KEY
+        )
+
+        return Response({
+            'access': access_token,
+            'refresh': refresh_token,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name
+            }
+        }, status=status.HTTP_200_OK)

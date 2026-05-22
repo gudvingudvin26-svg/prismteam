@@ -1,19 +1,9 @@
-/**
- * @fileoverview Страница регистрации организатора.
- * Поля: имя, email, пароль, подтверждение пароля.
- * После успеха автоматический вход и редирект в кабинет.
- */
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Input, Card } from '../components/ui';
 import { authApi } from '../api';
 import { useAppStore } from '../store/appStore';
 
-/**
- * Страница регистрации
- * @returns {JSX.Element}
- */
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const setUser = useAppStore((state) => state.setUser);
@@ -24,7 +14,6 @@ const Register: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  /** Валидация формы */
   const validate = (): boolean => {
     if (!name.trim()) {
       setError('Введите имя');
@@ -50,15 +39,13 @@ const Register: React.FC = () => {
     return true;
   };
 
-  /** Отправка формы */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
     setLoading(true);
     try {
-      // Предполагаем, что регистрация возвращает токены и пользователя
-      const response = await authApi.register(email, password, confirmPassword);
+      const response = await authApi.register(name, email, password, confirmPassword);
       const { access, refresh, user } = response.data;
       authApi.saveTokens(access, refresh);
       setUser(user);
@@ -77,8 +64,8 @@ const Register: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="max-w-md w-full p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="max-w-md w-full p-8 bg-white/90 backdrop-blur-sm">
         <div className="text-center mb-6">
           <h2 className="text-3xl font-bold text-gray-900">Регистрация</h2>
           <p className="text-gray-600 mt-2">Создайте аккаунт организатора</p>
@@ -97,7 +84,6 @@ const Register: React.FC = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            autoComplete="email"
           />
           <Input
             label="Пароль"
@@ -105,7 +91,6 @@ const Register: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            autoComplete="new-password"
             minLength={6}
           />
           <Input
@@ -114,7 +99,6 @@ const Register: React.FC = () => {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            autoComplete="new-password"
           />
 
           {error && (
@@ -130,7 +114,7 @@ const Register: React.FC = () => {
 
         <p className="mt-6 text-center text-gray-600">
           Уже есть аккаунт?{' '}
-          <Link to="/login" className="text-blue-600 hover:underline">
+          <Link to="/login" className="text-purple-600 hover:text-purple-700 font-medium hover:underline">
             Войти
           </Link>
         </p>

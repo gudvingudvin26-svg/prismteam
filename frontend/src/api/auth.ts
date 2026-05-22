@@ -4,8 +4,13 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login/', { email, password }),
 
-  register: (email: string, password: string, password2: string) =>
-    api.post('/auth/register/', { email, password, password2 }),
+  register: (username: string, email: string, password: string, password2: string) =>
+    api.post('/auth/register/', {
+      username: username,
+      email: email,
+      password: password,
+      again_password: password2
+    }),
 
   refresh: (refresh: string) =>
     api.post('/auth/refresh/', { refresh }),

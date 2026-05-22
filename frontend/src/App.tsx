@@ -22,16 +22,43 @@ function App() {
         <Route path="/play/:sessionId" element={<QuizSession />} />
         <Route path="/results/:sessionId" element={<Results />} />
 
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/quizzes" element={<QuizList />} />
-        <Route path="/quizzes/create" element={<CreateQuiz />} />
-        <Route path="/stats/:sessionId" element={<Stats />} />
-
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <Dashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/quizzes"
+          element={
+            <PrivateRoute>
+              <QuizList />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/quizzes/create"
+          element={
+            <PrivateRoute>
+              <CreateQuiz />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="/quizzes/:id/edit"
           element={
             <PrivateRoute>
               <div>Редактирование квиза (в разработке)</div>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/stats/:sessionId"
+          element={
+            <PrivateRoute>
+              <Stats />
             </PrivateRoute>
           }
         />
