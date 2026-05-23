@@ -85,40 +85,40 @@ const CreateQuiz: React.FC = () => {
   };
 
   const validate = (): boolean => {
-  if (!title.trim()) {
-    setError('Введите название квиза');
-    return false;
-  }
-  if (questions.length < 2) {
-    setError('Добавьте хотя бы два вопроса');
-    return false;
-  }
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    if (!q.text.trim()) {
-      setError(`Вопрос ${i + 1}: введите текст вопроса`);
+    if (!title.trim()) {
+      setError('Введите название квиза');
       return false;
     }
-    if (q.answers.length < 2) {
-      setError(`Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`);
+    if (questions.length < 2) {
+      setError('Добавьте хотя бы два вопроса');
       return false;
     }
-    let hasCorrect = false;
-    for (let j = 0; j < q.answers.length; j++) {
-      if (!q.answers[j].text.trim()) {
-        setError(`Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`);
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.text.trim()) {
+        setError(`Вопрос ${i + 1}: введите текст вопроса`);
         return false;
       }
-      if (q.answers[j].is_correct) hasCorrect = true;
+      if (q.answers.length < 2) {
+        setError(`Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`);
+        return false;
+      }
+      let hasCorrect = false;
+      for (let j = 0; j < q.answers.length; j++) {
+        if (!q.answers[j].text.trim()) {
+          setError(`Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`);
+          return false;
+        }
+        if (q.answers[j].is_correct) hasCorrect = true;
+      }
+      if (!hasCorrect) {
+        setError(`Вопрос ${i + 1}: выберите правильный вариант`);
+        return false;
+      }
     }
-    if (!hasCorrect) {
-      setError(`Вопрос ${i + 1}: выберите правильный вариант`);
-      return false;
-    }
-  }
-  setError('');
-  return true;
-};
+    setError('');
+    return true;
+  };
 
   const handleSubmit = async () => {
     if (!validate()) return;

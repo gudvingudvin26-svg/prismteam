@@ -21,7 +21,6 @@ const QuizSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const [question, setQuestion] = useState<QuestionData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [answered, setAnswered] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -31,7 +30,6 @@ const QuizSession: React.FC = () => {
   const fetchCurrentQuestion = async () => {
     if (!sessionId) return;
     setShowTransition(true);
-    setIsLoading(true);
     try {
       const res = await sessionsApi.getCurrentQuestion(Number(sessionId), questionIndex);
       if (res.data.finished) {
@@ -42,13 +40,11 @@ const QuizSession: React.FC = () => {
         setQuestion(res.data);
         if (res.data.timer) setTimeLeft(res.data.timer);
         setAnswered(false);
-        setIsLoading(false);
         setShowTransition(false);
       }, 300);
     } catch (err) {
       console.error('Error fetching question:', err);
       setError('Не удалось загрузить вопрос');
-      setIsLoading(false);
       setShowTransition(false);
     }
   };
