@@ -58,10 +58,10 @@ test:
   only:
     - main
 
-test_count:
-  stage: test
-  script:
-    - pytest --collect-only -q | wc -l
+#test_count:
+#  stage: test
+#  script:
+#    - pytest --collect-only -q | wc -l
 
 build:
   stage: build
