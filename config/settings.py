@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'channels',
     'app_modules.quiz',
+    'app_modules.quiz_sessions',
 ]
 
 MIDDLEWARE = [

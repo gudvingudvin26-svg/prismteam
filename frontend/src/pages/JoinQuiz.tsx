@@ -1,8 +1,3 @@
-/**
- * @fileoverview Страница для входа участника в игру по коду.
- * Участник вводит 6-значный код и свой никнейм, затем перенаправляется на страницу игры.
- */
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input, Card } from '../components/ui';
@@ -29,7 +24,7 @@ const JoinQuiz: React.FC = () => {
     setLoading(true);
     try {
       const response = await sessionsApi.joinSession(code.toUpperCase(), nickname);
-      const sessionId = response.data.session_id; // предположим, что бэк возвращает session_id
+      const sessionId = response.data.session_id;
       navigate(`/play/${sessionId}`);
     } catch (err) {
       setError('Неверный код или ошибка подключения');
@@ -39,9 +34,9 @@ const JoinQuiz: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <Card className="max-w-md w-full p-8">
-        <h2 className="text-2xl font-bold text-center mb-6">Вход в игру</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 px-4">
+      <Card className="max-w-md w-full p-8 bg-white/90 backdrop-blur-sm">
+        <h2 className="text-2xl font-bold text-center mb-6 text-gray-900">Вход в игру</h2>
         <form onSubmit={handleSubmit}>
           <Input
             label="Код комнаты"
@@ -59,7 +54,7 @@ const JoinQuiz: React.FC = () => {
           />
           {error && <div className="mb-4 text-red-600 text-sm">{error}</div>}
           <Button type="submit" fullWidth isLoading={loading}>
-            Войти
+            {loading ? 'Подключение...' : 'Войти'}
           </Button>
         </form>
       </Card>

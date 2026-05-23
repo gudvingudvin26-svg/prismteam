@@ -3,14 +3,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button, Card, Modal } from '../../components/ui';
 import { quizzesApi, sessionsApi } from '../../api';
 import { Quiz } from '../../types';
+import { useAppStore } from '../../store/appStore';
 
 const QuizList: React.FC = () => {
   const navigate = useNavigate();
+  const user = useAppStore((state) => state.user);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [sessionCode, setSessionCode] = useState('');
-  const [selectedQuizId, setSelectedQuizId] = useState<number | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
   useEffect(() => {
     loadQuizzes();
@@ -35,12 +37,18 @@ const QuizList: React.FC = () => {
   };
 
   const handleRun = async (quizId: number) => {
+    const participantName = user?.first_name || user?.username || 'Участник';
+
     try {
       const res = await sessionsApi.createSession(quizId);
       setSessionCode(res.data.code);
-      setSelectedQuizId(quizId);
+      setSelectedSessionId(res.data.id);
+
+      await sessionsApi.joinSession(res.data.code, participantName);
+
       setModalOpen(true);
     } catch (error) {
+      console.error(error);
       alert('Не удалось создать сессию');
     }
   };
@@ -48,7 +56,7 @@ const QuizList: React.FC = () => {
   const closeModal = () => {
     setModalOpen(false);
     setSessionCode('');
-    setSelectedQuizId(null);
+    setSelectedSessionId(null);
   };
 
   if (loading) return <div className="flex justify-center items-center h-screen text-white">Загрузка...</div>;
@@ -93,7 +101,7 @@ const QuizList: React.FC = () => {
           <p className="text-sm text-gray-500">Сообщите код участникам, чтобы они могли присоединиться.</p>
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="outline" onClick={closeModal}>Закрыть</Button>
-            <Button variant="primary" onClick={() => navigate(`/play/${selectedQuizId}`)}>Начать игру</Button>
+            <Button variant="primary" onClick={() => navigate(`/play/${selectedSessionId}`)}>Начать игру</Button>
           </div>
         </Modal>
       </div>

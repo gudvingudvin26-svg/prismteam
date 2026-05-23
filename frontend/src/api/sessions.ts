@@ -2,35 +2,35 @@ import api from './api'
 
 export const sessionsApi = {
   createSession: (quizId: number) =>
-    api.post('/sessions/', { quiz_id: quizId }),
+    api.post('/api/organizer/sessions/', { quiz: quizId }),
 
   joinSession: (code: string, nickname: string) =>
-    api.post('/sessions/join/', { code, nickname }),
+    api.post('/api/organizer/sessions/join/', { code, nickname }),
 
   startSession: (sessionId: number) =>
-    api.post(`/sessions/${sessionId}/start/`),
+    api.post(`/api/organizer/sessions/${sessionId}/start/`),
 
   endSession: (sessionId: number) =>
-    api.post(`/sessions/${sessionId}/end/`),
+    api.post(`/api/organizer/sessions/${sessionId}/end/`),
 
   getSession: (sessionId: number) =>
-    api.get(`/sessions/${sessionId}/`),
+    api.get(`/api/organizer/sessions/${sessionId}/`),
 
-  getCurrentQuestion: (sessionId: number) =>
-    api.get(`/sessions/${sessionId}/current-question/`),
+  getCurrentQuestion: (sessionId: number, index: number = 0) =>
+    api.get(`/api/organizer/sessions/${sessionId}/?index=${index}`),
 
   submitAnswer: (sessionId: number, questionId: number, answerId: number) =>
-    api.post(`/sessions/${sessionId}/answer/`, {
+    api.post(`/api/organizer/sessions/${sessionId}/answer/`, {
       question_id: questionId,
       answer_id: answerId
     }),
 
   getMyResult: (sessionId: number) =>
-    api.get(`/sessions/${sessionId}/my-result/`),
+    api.get(`/api/organizer/sessions/${sessionId}/my_result/`),
 
   getResults: (sessionId: number) =>
-    api.get(`/sessions/${sessionId}/results/`),
+    api.get(`/api/organizer/sessions/${sessionId}/results/`),
 
   getQuestionsStats: (sessionId: number) =>
-    api.get(`/sessions/${sessionId}/questions-stats/`)
+    api.get(`/api/organizer/sessions/${sessionId}/questions_stats/`)
 }

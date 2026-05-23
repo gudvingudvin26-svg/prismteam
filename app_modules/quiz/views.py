@@ -174,10 +174,8 @@ class UserRegistrationAPI(APIView):
     def post(self, request):
         print("=== REGISTRATION REQUEST ===")
         print("Request data:", request.data)
-        print("Request data type:", type(request.data))
 
         serializer = UserSerializer(data=request.data)
-        print("Serializer is valid:", serializer.is_valid())
         if not serializer.is_valid():
             print("Serializer errors:", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -186,6 +184,7 @@ class UserRegistrationAPI(APIView):
         email = request.data.get('email')
         password = request.data.get('password')
         again_password = request.data.get('again_password')
+        first_name = request.data.get('first_name', '')
 
         if not username:
             return Response({'error': 'Username required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -199,6 +198,7 @@ class UserRegistrationAPI(APIView):
             return Response({'error': 'Password must be at least 6 characters'}, status=status.HTTP_400_BAD_REQUEST)
 
         user = serializer.save()
+        user.first_name = first_name
         user.set_password(password)
         user.save()
 

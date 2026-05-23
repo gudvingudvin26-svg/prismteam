@@ -7,11 +7,13 @@ from app_modules.quiz.views import (
     QuizViewSet, QuestionViewSet, AnswerOptionViewSet,
     UserRegistrationAPI, UserLoginAPI
 )
+from app_modules.quiz_sessions.views import QuizSessionViewSet
 
 router = DefaultRouter()
 router.register(r'quizzes', QuizViewSet, basename='quiz')
 router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'answers', AnswerOptionViewSet, basename='answerooption')
+router.register(r'sessions', QuizSessionViewSet, basename='session')  # ← добавить
 
 urlpatterns = [
     path('admin/', admin.site.urls),
