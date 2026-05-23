@@ -38,7 +38,7 @@ lint:
     - source venv/bin/activate
     - pip install flake8
   script:
-    - flake8 . --max-line-length=12000
+    - flake8 backend/ --max-line-length=120 --exclude=migrations,__pycache__
   only:
     - main
 
@@ -58,10 +58,16 @@ test:
   only:
     - main
 
-#test_count:
-#  stage: test
-#  script:
-#    - pytest --collect-only -q | wc -l
+test_count:
+  stage: test
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install pytest
+  script:
+    - pytest --collect-only -q | wc -l
+  only:
+    - main
 
 build:
   stage: build
