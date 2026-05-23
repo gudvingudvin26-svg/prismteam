@@ -1,10 +1,19 @@
-﻿import { create } from 'zustand'
+﻿import { create } from 'zustand';
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+}
 
 interface AppState {
-  user: null | { id: string; name: string; role: string }
-  isLoading: boolean
-  setUser: (user: null | { id: string; name: string; role: string }) => void
-  setLoading: (loading: boolean) => void
+  user: User | null;
+  isLoading: boolean;
+  setUser: (user: User | null) => void;
+  setLoading: (loading: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -12,4 +21,4 @@ export const useAppStore = create<AppState>((set) => ({
   isLoading: false,
   setUser: (user) => set({ user }),
   setLoading: (loading) => set({ isLoading: loading })
-}))
+}));

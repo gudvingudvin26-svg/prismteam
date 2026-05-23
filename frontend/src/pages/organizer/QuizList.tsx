@@ -82,13 +82,13 @@ const QuizList: React.FC = () => {
                 <h3 className="text-xl font-semibold mb-2 text-gray-900">{quiz.title}</h3>
                 <p className="text-gray-600 mb-4">{quiz.description}</p>
                 <div className="text-sm text-gray-500 mb-4">
-                  Создан: {new Date(quiz.created_at).toLocaleDateString()}
+                  Создан: {new Date(quiz.created_at || Date.now()).toLocaleDateString()}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="primary" onClick={() => handleRun(quiz.id)}>Запустить</Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/quizzes/${quiz.id}/edit`)}>Редактировать</Button>
-                  <Button size="sm" variant="danger" onClick={() => handleDelete(quiz.id)}>Удалить</Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/stats/${quiz.id}`)}>Статистика</Button>
+                  <Button size="sm" variant="primary" onClick={() => quiz.id && handleRun(quiz.id)}>Запустить</Button>
+                  <Button size="sm" variant="outline" onClick={() => quiz.id && navigate(`/quizzes/${quiz.id}/edit`)}>Редактировать</Button>
+                  <Button size="sm" variant="danger" onClick={() => quiz.id && handleDelete(quiz.id)}>Удалить</Button>
+                  <Button size="sm" variant="outline" onClick={() => quiz.id && navigate(`/stats/${quiz.id}`)}>Статистика</Button>
                 </div>
               </Card>
             ))}
@@ -101,7 +101,7 @@ const QuizList: React.FC = () => {
           <p className="text-sm text-gray-500">Сообщите код участникам, чтобы они могли присоединиться.</p>
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="outline" onClick={closeModal}>Закрыть</Button>
-            <Button variant="primary" onClick={() => navigate(`/play/${selectedSessionId}`)}>Начать игру</Button>
+            <Button variant="primary" onClick={() => selectedSessionId && navigate(`/play/${selectedSessionId}`)}>Начать игру</Button>
           </div>
         </Modal>
       </div>

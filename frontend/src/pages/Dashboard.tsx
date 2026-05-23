@@ -47,7 +47,7 @@ const Dashboard: React.FC = () => {
       <header className="bg-white/10 backdrop-blur-md shadow-md py-4 px-6 flex justify-between items-center border-b border-white/20">
         <Link to="/" className="text-2xl font-bold text-white drop-shadow-md">QuizMaster</Link>
         <div className="flex items-center gap-4">
-          <span className="text-white">Привет, {user?.first_name || user?.email}</span>
+          <span className="text-white">Привет, {user?.first_name || user?.username || user?.email}</span>
           <Button variant="outline" size="sm" onClick={handleLogout} className="!text-black bg-white hover:bg-gray-100">Выйти</Button>
         </div>
       </header>
@@ -94,7 +94,7 @@ const Dashboard: React.FC = () => {
                   <Card key={quiz.id} className="p-4 flex justify-between items-center bg-white shadow-md">
                     <div>
                       <h3 className="font-semibold text-gray-900">{quiz.title}</h3>
-                      <p className="text-sm text-gray-500">Создан: {new Date(quiz.created_at).toLocaleDateString()}</p>
+                      <p className="text-sm text-gray-500">Создан: {new Date(quiz.created_at || Date.now()).toLocaleDateString()}</p>
                     </div>
                     <Link to={`/quizzes/${quiz.id}/edit`}>
                       <Button variant="outline" size="sm">Редактировать</Button>

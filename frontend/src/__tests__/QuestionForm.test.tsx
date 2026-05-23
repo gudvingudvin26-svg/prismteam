@@ -1,5 +1,6 @@
-   import React from 'react';
+import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import QuestionForm from '../components/quiz/QuestionForm';
 
 describe('QuestionForm', () => {
@@ -20,7 +21,7 @@ describe('QuestionForm', () => {
     jest.clearAllMocks();
   });
 
-  test('рендерит форму вопроса', () => {
+  test('renders question form', () => {
     render(
       <QuestionForm
         question={mockQuestion}
@@ -32,7 +33,7 @@ describe('QuestionForm', () => {
     expect(screen.getByText('Вопрос 1')).toBeInTheDocument();
   });
 
-  test('вызывает onDelete при нажатии на кнопку удаления', () => {
+  test('calls onDelete when delete button clicked', () => {
     render(
       <QuestionForm
         question={mockQuestion}
@@ -46,7 +47,7 @@ describe('QuestionForm', () => {
     expect(mockOnDelete).toHaveBeenCalledTimes(1);
   });
 
-  test('обновляет текст вопроса при изменении', () => {
+  test('updates question text on change', () => {
     render(
       <QuestionForm
         question={mockQuestion}
@@ -57,15 +58,15 @@ describe('QuestionForm', () => {
     );
 
     const textInput = screen.getByLabelText('Текст вопроса');
-    fireEvent.change(textInput, { target: { value: 'Новый вопрос' } });
+    fireEvent.change(textInput, { target: { value: 'New question' } });
 
     expect(mockOnChange).toHaveBeenCalledWith({
       ...mockQuestion,
-      text: 'Новый вопрос'
+      text: 'New question'
     });
   });
 
-  test('добавляет новый вариант ответа', () => {
+  test('adds new answer option', () => {
     render(
       <QuestionForm
         question={mockQuestion}
@@ -84,7 +85,7 @@ describe('QuestionForm', () => {
     });
   });
 
-  test('показывает ошибку при пустом тексте вопроса после потери фокуса', () => {
+  test('shows error when question text is empty on blur', () => {
     render(
       <QuestionForm
         question={mockQuestion}
