@@ -26,9 +26,11 @@ const QuizSession: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [questionIndex, setQuestionIndex] = useState(0);
+  const [showTransition, setShowTransition] = useState(false);
 
   const fetchCurrentQuestion = async () => {
     if (!sessionId) return;
+    setShowTransition(true);
     setIsLoading(true);
     try {
       const res = await sessionsApi.getCurrentQuestion(Number(sessionId), questionIndex);
@@ -36,14 +38,18 @@ const QuizSession: React.FC = () => {
         navigate(`/results/${sessionId}`);
         return;
       }
-      setQuestion(res.data);
-      if (res.data.timer) setTimeLeft(res.data.timer);
-      setAnswered(false);
+      setTimeout(() => {
+        setQuestion(res.data);
+        if (res.data.timer) setTimeLeft(res.data.timer);
+        setAnswered(false);
+        setIsLoading(false);
+        setShowTransition(false);
+      }, 300);
     } catch (err) {
       console.error('Error fetching question:', err);
       setError('Не удалось загрузить вопрос');
-    } finally {
       setIsLoading(false);
+      setShowTransition(false);
     }
   };
 
@@ -88,33 +94,50 @@ const QuizSession: React.FC = () => {
     }
   };
 
-  if (isLoading) return <div className="flex justify-center items-center h-screen text-white">Загрузка...</div>;
   if (error) return <div className="text-red-600 text-center mt-10">{error}</div>;
+
+  if (showTransition) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-white border-opacity-50 mx-auto mb-4"></div>
+          <p className="text-white text-lg animate-pulse">Загрузка следующего вопроса...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!question) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 flex items-center justify-center p-4">
-      <Card className="max-w-2xl w-full p-8 bg-white/90 backdrop-blur-sm">
+      <Card className="max-w-2xl w-full p-8 bg-white/90 backdrop-blur-sm animate-fadeIn">
         {timeLeft !== null && (
-          <div className="text-right text-2xl font-mono mb-4">
+          <div className={`text-right text-2xl font-mono mb-4 transition-all duration-300 ${timeLeft <= 5 ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}>
             {timeLeft} сек
           </div>
         )}
         <h2 className="text-2xl font-bold mb-6 text-gray-900">{question.text}</h2>
         <div className="space-y-3">
-          {question.answers.map((answer) => (
+          {question.answers.map((answer, idx) => (
             <Button
               key={answer.id}
               variant="outline"
               fullWidth
               onClick={() => handleAnswer(answer.id)}
               disabled={answered}
+              className={`transform transition-all duration-200 hover:scale-105 ${answered ? 'opacity-50' : ''}`}
+              style={{ animationDelay: `${idx * 50}ms` }}
             >
               {answer.text}
             </Button>
           ))}
         </div>
-        {answered && <div className="mt-4 text-center text-gray-500">Ответ принят, загружаем следующий вопрос...</div>}
+        {answered && (
+          <div className="mt-4 text-center text-gray-500 animate-pulse">
+            Ответ принят, загружаем следующий вопрос...
+          </div>
+        )}
       </Card>
     </div>
   );
