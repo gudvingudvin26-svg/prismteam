@@ -36,3 +36,10 @@ export interface SessionResult {
   total_questions: number;
   completed_at: string;
 }
+
+export interface CurrentQuestion {
+  id: number;
+  text: string;
+  timer?: number;
+  answers: { id: number; text: string }[];
+}
