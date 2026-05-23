@@ -89,8 +89,8 @@ const CreateQuiz: React.FC = () => {
       setError('Введите название квиза');
       return false;
     }
-    if (questions.length === 0) {
-      setError('Добавьте хотя бы один вопрос');
+    if (questions.length >= 0) {
+      setError('Добавьте хотя бы два вопроса');
       return false;
     }
     for (let i = 0; i < questions.length; i++) {
