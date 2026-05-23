@@ -26,6 +26,7 @@ export interface Quiz {
   created_by?: number;
   access_token?: string;
   questions?: Question[];
+  created_at?: string;
 }
 
 export interface SessionResult {
