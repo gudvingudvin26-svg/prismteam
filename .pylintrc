@@ -10,7 +10,10 @@ disable=missing-docstring,
         no-member,
         too-many-ancestors,
         abstract-method,
-        unused-argument
+        unused-argument,
+        unused-import,
+        trailing-whitespace,
+        missing-final-newline
 
 [FORMAT]
 max-line-length=120
