@@ -15,42 +15,71 @@ const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const validate = (): boolean => {
+    console.log('=== VALIDATION START ===');
+    console.log('Name:', name);
+    console.log('Email:', email);
+    console.log('Password length:', password.length);
+
     if (!name.trim()) {
       setError('Введите имя');
+      console.log('Validation failed: name empty');
       return false;
     }
     if (!email.trim()) {
       setError('Введите email');
+      console.log('Validation failed: email empty');
       return false;
     }
     if (!password) {
       setError('Введите пароль');
+      console.log('Validation failed: password empty');
       return false;
     }
     if (password.length < 6) {
       setError('Пароль должен содержать минимум 6 символов');
+      console.log('Validation failed: password too short');
       return false;
     }
     if (password !== confirmPassword) {
       setError('Пароли не совпадают');
+      console.log('Validation failed: passwords do not match');
       return false;
     }
     setError('');
+    console.log('Validation passed');
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    console.log('=== FORM SUBMITTED ===');
+    console.log('Name:', name);
+    console.log('Email:', email);
+
+    if (!validate()) {
+      console.log('Validation failed, aborting');
+      return;
+    }
+    console.log('Validation passed, proceeding to API call');
 
     setLoading(true);
     try {
+      console.log('Calling authApi.register...');
       const response = await authApi.register(name, email, password, confirmPassword);
+      console.log('API Response:', response);
+      console.log('Response data:', response.data);
+
       const { access, refresh, user } = response.data;
       authApi.saveTokens(access, refresh);
       setUser(user);
+      console.log('Registration successful, navigating to /dashboard');
       navigate('/dashboard');
     } catch (err: any) {
+      console.error('=== ERROR ===');
+      console.error('Error object:', err);
+      console.error('Error response:', err.response);
+      console.error('Error data:', err.response?.data);
+
       const data = err.response?.data;
       if (data && typeof data === 'object') {
         const firstError = Object.values(data)[0];
