@@ -182,5 +182,10 @@ cython_debug/
 [Ss]cripts
 pyvenv.cfg
 pip-selfcheck.json
-
+# Frontend
+node_modules/
+frontend/node_modules/
+dist/
+.vite/
+.env.local
 # End of https://www.toptal.com/developers/gitignore/api/django,venv

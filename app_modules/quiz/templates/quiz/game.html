@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Game</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'quiz/css/style.css' %}">
+</head>
+<body>
+    <div class="quiz-container">
+        <div class="timer" id="timer">30</div>
+
+        <h2 class="question-text" id="question-text">
+            Загрузка вопроса...
+        </h2>
+
+        <div class="answers-block" id="answers-block">
+            <!-- Кнопки ответов будут добавлены через JS -->
+        </div>
+
+        <div class="question-counter">
+            Вопрос <span id="current-question">1</span> из
+            <span id="total-questions">10</span>
+        </div>
+    </div>
+
+    <script>
+        const quizId = {{ quiz.id }};
+        const wsUrl = 'ws://' + window.location.host + '/ws/quiz/' + quizId + '/';
+    </script>
+    <script src="{% static 'quiz/js/timer.js' %}"></script>
+    <script src="{% static 'quiz/js/ws.js' %}"></script>
+    <script src="{% static 'quiz/js/game.js' %}"></script>
+</body>
+</html>

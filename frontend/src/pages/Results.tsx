@@ -1,0 +1,107 @@
+/**
+ * @fileoverview Страница результатов после завершения квиза.
+ * Отображает личный результат (баллы, место, правильные ответы) и таблицу лидеров.
+ */
+
+import React, { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { Card, Button } from '../components/ui';
+import { sessionsApi } from '../api';
+import { ParticipantResult, QuestionStat } from '../types';
+
+const Results: React.FC = () => {
+  const { sessionId } = useParams<{ sessionId: string }>();
+  const [myResult, setMyResult] = useState<ParticipantResult | null>(null);
+  const [leaderboard, setLeaderboard] = useState<ParticipantResult[]>([]);
+  const [questionsStats, setQuestionsStats] = useState<QuestionStat[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchResults = async () => {
+      if (!sessionId) return;
+      try {
+        const [myRes, leaderRes, statsRes] = await Promise.all([
+          sessionsApi.getMyResult(Number(sessionId)),
+          sessionsApi.getResults(Number(sessionId)),
+          sessionsApi.getQuestionsStats(Number(sessionId)),
+        ]);
+        setMyResult(myRes.data);
+        setLeaderboard(leaderRes.data);
+        setQuestionsStats(statsRes.data);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchResults();
+  }, [sessionId]);
+
+  if (loading) return <div className="text-center mt-10">Загрузка результатов...</div>;
+
+  return (
+    <div className="max-w-4xl mx-auto py-8 px-4">
+      <h1 className="text-2xl font-bold mb-6">Результаты</h1>
+
+      {myResult && (
+        <Card className="p-6 mb-8 text-center bg-blue-50">
+          <h2 className="text-xl font-semibold mb-2">Ваш результат</h2>
+          <p className="text-3xl font-bold text-blue-600">{myResult.score} баллов</p>
+          <p>Правильных ответов: {myResult.correct_answers}</p>
+          <p>Место: {myResult.rank ?? '—'}</p>
+        </Card>
+      )}
+
+      <h2 className="text-xl font-semibold mb-4">Таблица лидеров</h2>
+      <Card className="p-0 overflow-hidden mb-8">
+        <table className="w-full">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="p-3 text-left">Место</th>
+              <th className="p-3 text-left">Участник</th>
+              <th className="p-3 text-left">Баллы</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaderboard.map((p, idx) => (
+              <tr key={p.participant_id} className="border-t">
+                <td className="p-3">{idx + 1}</td>
+                <td className="p-3">{p.nickname}</td>
+                <td className="p-3">{p.score}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      <h2 className="text-xl font-semibold mb-4">Статистика по вопросам</h2>
+      <div className="space-y-3">
+        {questionsStats.map((stat) => (
+          <Card key={stat.question_id} className="p-4">
+            <p className="font-medium">{stat.question_text}</p>
+            <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
+              <div
+                className="bg-green-500 h-4 rounded-full"
+                style={{ width: `${stat.correct_percent}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">
+              {stat.correct_count} из {stat.total_answers} правильных ({stat.correct_percent}%)
+            </p>
+          </Card>
+        ))}
+      </div>
+
+      <div className="mt-8 flex gap-4 justify-center">
+        <Link to="/">
+          <Button variant="outline">На главную</Button>
+        </Link>
+        <Link to="/join">
+          <Button variant="primary">Играть снова</Button>
+        </Link>
+      </div>
+    </div>
+  );
+};
+
+export default Results;
