@@ -13,7 +13,7 @@ router = DefaultRouter()
 router.register(r'quizzes', QuizViewSet, basename='quiz')
 router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'answers', AnswerOptionViewSet, basename='answerooption')
-router.register(r'sessions', QuizSessionViewSet, basename='session')  # ← добавить
+router.register(r'sessions', QuizSessionViewSet, basename='session')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,7 +24,7 @@ urlpatterns = [
 
     path('auth/register/', UserRegistrationAPI.as_view(), name='auth_register'),
     path('auth/login/', UserLoginAPI.as_view(), name='auth_login'),
-    path('api/auth/login/', UserLoginAPI.as_view(), name='api_login'),
     path('api/auth/register/', UserRegistrationAPI.as_view(), name='api_register'),
+    path('api/auth/login/', UserLoginAPI.as_view(), name='api_login'),
     path('api/organizer/', include(router.urls)),
 ]
