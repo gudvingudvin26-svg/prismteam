@@ -24,6 +24,7 @@ const CreateQuiz: React.FC = () => {
   ]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  let createdQuizId: number | null = null;
 
   const addQuestion = () => {
     setQuestions([...questions, { text: '', answers: [{ text: '', is_correct: false }, { text: '', is_correct: false }] }]);
@@ -114,27 +115,41 @@ const CreateQuiz: React.FC = () => {
   const handleSubmit = async () => {
     if (!validate()) return;
     setLoading(true);
+    createdQuizId = null;
+
     try {
       const quizRes = await quizzesApi.createQuiz({
         title,
         description,
         timer: globalTimer,
       });
-      const quizId = quizRes.data.id;
+      createdQuizId = quizRes.data.id;
 
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
-        await quizzesApi.createQuestion(quizId, {
+        await quizzesApi.createQuestion(createdQuizId, {
           text: q.text,
           order: i + 1,
           timer: q.timer,
-          answers: q.answers.map(a => ({ text: a.text, is_correct: a.is_correct })),
+          answer_options: q.answers.map(a => ({ text: a.text, is_correct: a.is_correct })),
         });
       }
       navigate('/quizzes');
-    } catch (err) {
-      setError('Ошибка при создании квиза. Попробуйте позже.');
-      console.error(err);
+    } catch (err: any) {
+      console.error('Full error:', err);
+      if (createdQuizId) {
+        try {
+          await quizzesApi.deleteQuiz(createdQuizId);
+        } catch (deleteErr) {
+          console.error('Failed to delete quiz:', deleteErr);
+        }
+      }
+      if (err.response) {
+        console.error('Error response data:', err.response.data);
+        setError(`Ошибка: ${JSON.stringify(err.response.data)}`);
+      } else {
+        setError('Ошибка при создании квиза. Попробуйте позже.');
+      }
     } finally {
       setLoading(false);
     }
