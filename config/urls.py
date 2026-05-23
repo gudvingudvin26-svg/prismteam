@@ -21,7 +21,8 @@ urlpatterns = [
     path('logout/', UserLogout.as_view(), name='logout'),
 
     path('auth/register/', UserRegistrationAPI.as_view(), name='auth_register'),
-    path('auth/login/', UserLoginAPI.as_view(), name='auth_login'),  # ← добавить
+    path('auth/login/', UserLoginAPI.as_view(), name='auth_login'),
+    path('api/auth/login/', UserLoginAPI.as_view(), name='api_login'),
     path('api/auth/register/', UserRegistrationAPI.as_view(), name='api_register'),
     path('api/organizer/', include(router.urls)),
 ]

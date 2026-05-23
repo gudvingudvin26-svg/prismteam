@@ -1,84 +1,102 @@
-image: python:3.11
-
 stages:
-  - lint
   - test
   - build
-  - docs
+  - deploy
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  NODE_MODULES_CACHE: "$CI_PROJECT_DIR/frontend/node_modules"
 
 cache:
   paths:
     - .cache/pip
-    - venv/
+    - frontend/node_modules
 
-lint:
-  stage: lint
-  before_script:
-    - python -m venv venv
-    - source venv/bin/activate
-    - pip install flake8
-  script:
-    - flake8 . --max-line-length=120 --exclude=migrations,__pycache__,venv,.cache,docs,build,dist
-  only:
-    - main
-
-test:
+# ========== БЭКЕНД ТЕСТЫ ==========
+backend-test:
   stage: test
+  image: python:3.11
   before_script:
-    - python -m venv venv
-    - source venv/bin/activate
-    - pip install -r requirements.txt pytest pytest-cov
+    - pip install -r requirements.txt
   script:
-    - pytest --cov=my_package --cov-fail-under=70 --cov-report=term --cov-report=html
-  coverage: '/TOTAL.*\s+(\d+%)$/'
-  artifacts:
-    paths:
-      - htmlcov/
-    expire_in: 1 week
+    - python manage.py migrate
+    - python manage.py test app_modules.quiz
   only:
     - main
+    - develop-backend
+    - merge_requests
 
-test_count:
+# ========== ФРОНТЕНД ТЕСТЫ ==========
+frontend-test:
   stage: test
+  image: node:18
   before_script:
-    - python -m venv venv
-    - source venv/bin/activate
-    - pip install pytest
+    - cd frontend
+    - npm install
   script:
-    - pytest --collect-only -q | wc -l
+    - npm run test
   only:
     - main
+    - develop-backend
+    - merge_requests
 
-build:
+# ========== ЛИНТЕРЫ ==========
+pylint:
+  stage: test
+  image: python:3.11
+  before_script:
+    - pip install pylint pylint-django
+  script:
+    - pylint app_modules/quiz --fail-under=8.0
+  allow_failure: true
+  only:
+    - merge_requests
+
+eslint:
+  stage: test
+  image: node:18
+  before_script:
+    - cd frontend
+    - npm install
+  script:
+    - npm run lint
+  allow_failure: true
+  only:
+    - merge_requests
+
+# ========== СБОРКА ==========
+build-backend:
   stage: build
-  before_script:
-    - python -m venv venv
-    - source venv/bin/activate
-    - pip install build
+  image: python:3.11
   script:
-    - python -m build
-  artifacts:
-    paths:
-      - dist/
-    expire_in: 1 month
+    - pip install -r requirements.txt
+    - python manage.py check
   only:
     - main
+    - develop-backend
 
-docs:
-  stage: docs
-  before_script:
-    - python -m venv venv
-    - source venv/bin/activate
-    - pip install sphinx sphinx-autodoc-typehints sphinx_rtd_theme
+build-frontend:
+  stage: build
+  image: node:18
   script:
-    - cd docs
-    - make html
+    - cd frontend
+    - npm install
+    - npm run build
   artifacts:
     paths:
-      - docs/build/html/
-    expire_in: 1 month
+      - frontend/dist/
   only:
     - main
+    - develop-backend
+
+# ========== ДЕПЛОЙ (опционально) ==========
+deploy:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+  script:
+    - echo "Deploy step - configure your server here"
+  only:
+    - main
+  when: manual

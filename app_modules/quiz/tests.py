@@ -1,19 +1,18 @@
-from http.client import responses
-import datetime
-
+import django
 from django.test import TestCase, Client
+from django.conf import settings
 from django.urls import reverse
 from django.contrib import auth
+from django.apps import apps
 
 from .models import User
 
 
-# Create your tests here.
+# ========== ТЕСТЫ АУТЕНТИФИКАЦИИ ==========
 class TestLogin(TestCase):
     def setUp(self):
         self.client = Client()
-        User.objects.create(username="Just_random_user", email="just.random_user@gmail.com", phone = '7123456789' , password="1234")
-
+        User.objects.create(username="Just_random_user", email="just.random_user@gmail.com", phone='7123456789', password="1234")
 
     def test_get(self):
         self.assertEqual(self.client.get(reverse('login')).status_code, 200)
@@ -43,10 +42,10 @@ class TestLogin(TestCase):
         user = auth.get_user(self.client)
         assert not user.is_authenticated
 
+
 class TestRegistration(TestCase):
     def setUp(self):
         self.client = Client()
-
 
     def test_get(self):
         self.assertEqual(self.client.get(reverse('registration')).status_code, 200)
@@ -81,11 +80,11 @@ class TestRegistration(TestCase):
         user = auth.get_user(self.client)
         assert not user.is_authenticated
 
+
 class TestLogout(TestCase):
     def setUp(self):
         self.client = Client()
         User.objects.create(username="Just_random_user", email="just.random_user@gmail.com", phone='7123456789', password="1234")
-
 
     def test_get(self):
         self.assertEqual(self.client.get(reverse('logout')).status_code, 302)
@@ -94,3 +93,29 @@ class TestLogout(TestCase):
         self.client.post(reverse('logout'), {})
         user = auth.get_user(self.client)
         assert not user.is_authenticated
+
+
+class InfrastructureTestCase(TestCase):
+
+    def test_settings_module(self):
+        self.assertEqual(settings.SETTINGS_MODULE, 'config.settings')
+
+    def test_app_installed(self):
+        self.assertIn('app_modules.quiz', settings.INSTALLED_APPS)
+
+    def test_auth_user_model_custom(self):
+        self.assertEqual(settings.AUTH_USER_MODEL, 'quiz.User')
+
+    def test_models_module_importable(self):
+        try:
+            import app_modules.quiz.models as models_module
+        except ImportError:
+            self.fail("Не удалось импортировать app_modules.quiz.models")
+        self.assertIsNotNone(models_module)
+
+    def test_admin_module_importable(self):
+        try:
+            import app_modules.quiz.admin as admin_module
+        except ImportError:
+            self.fail("Не удалось импортировать app_modules.quiz.admin")
+        self.assertIsNotNone(admin_module)

@@ -10,6 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from config import settings
 from .models import User, Quiz, Question, AnswerOption
@@ -19,7 +20,6 @@ from .validators import validate_quiz_integrity
 logger = logging.getLogger('reg-log_logger')
 
 
-# === Auth-модуль ===
 class UserRegistration(APIView):
     def post(self, request):
         serializer = UserSerializer(data=request.data)
@@ -119,7 +119,6 @@ class UserLogout(APIView):
         return redirect('http://127.0.0.1:8000/main/')
 
 
-# === Quiz-constructor ViewSets ===
 class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -169,9 +168,7 @@ class AnswerOptionViewSet(viewsets.ModelViewSet):
         return AnswerOption.objects.filter(
             question__quiz__created_by=user
         ).select_related('question__quiz')
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
+
 
 class UserRegistrationAPI(APIView):
     def post(self, request):
@@ -205,22 +202,11 @@ class UserRegistrationAPI(APIView):
         user.set_password(password)
         user.save()
 
-        from datetime import datetime, timedelta
-        import jwt
-        from config import settings
-
-        access_token = jwt.encode(
-            {'sub': user.id, 'exp': datetime.now() + timedelta(hours=1), 'name': user.username, 'email': user.email},
-            key=settings.SECRET_KEY
-        )
-        refresh_token = jwt.encode(
-            {'sub': user.id, 'exp': datetime.now() + timedelta(days=7)},
-            key=settings.SECRET_KEY
-        )
+        refresh = RefreshToken.for_user(user)
 
         return Response({
-            'access': access_token,
-            'refresh': refresh_token,
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
             'user': {
                 'id': user.id,
                 'username': user.username,
@@ -229,6 +215,8 @@ class UserRegistrationAPI(APIView):
                 'last_name': user.last_name
             }
         }, status=status.HTTP_201_CREATED)
+
+
 class UserLoginAPI(APIView):
     def post(self, request):
         email = request.data.get('email')
@@ -245,22 +233,11 @@ class UserLoginAPI(APIView):
         if not user.check_password(password):
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        from datetime import datetime, timedelta
-        import jwt
-        from config import settings
-
-        access_token = jwt.encode(
-            {'sub': user.id, 'exp': datetime.now() + timedelta(hours=1), 'name': user.username, 'email': user.email},
-            key=settings.SECRET_KEY
-        )
-        refresh_token = jwt.encode(
-            {'sub': user.id, 'exp': datetime.now() + timedelta(days=7)},
-            key=settings.SECRET_KEY
-        )
+        refresh = RefreshToken.for_user(user)
 
         return Response({
-            'access': access_token,
-            'refresh': refresh_token,
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
             'user': {
                 'id': user.id,
                 'username': user.username,
