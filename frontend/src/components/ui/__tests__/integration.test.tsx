@@ -1,29 +1,29 @@
-import React, { useState } from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { Button, Input, Card, Modal } from '../index'
+import { useState } from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { Button, Input, Card, Modal } from '../index';
 
 describe('Integration Tests', () => {
-  test('форма с input и кнопкой работает', () => {
-    const handleSubmit = jest.fn()
+  test('form with input and button works', () => {
+    const handleSubmit = jest.fn();
 
     render(
       <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
         <Input label="Имя" data-testid="name-input" />
         <Button type="submit">Отправить</Button>
       </form>
-    )
+    );
 
-    const input = screen.getByTestId('name-input')
-    fireEvent.change(input, { target: { value: 'Тест' } })
-    expect(input).toHaveValue('Тест')
+    const input = screen.getByTestId('name-input');
+    fireEvent.change(input, { target: { value: 'Тест' } });
+    expect(input).toHaveValue('Тест');
 
-    fireEvent.click(screen.getByText('Отправить'))
-    expect(handleSubmit).toHaveBeenCalled()
-  })
+    fireEvent.click(screen.getByText('Отправить'));
+    expect(handleSubmit).toHaveBeenCalled();
+  });
 
-  test('модалка с формой работает', () => {
+  test('modal with form works', () => {
     const TestComponent = () => {
-      const [isOpen, setIsOpen] = useState(false)
+      const [isOpen, setIsOpen] = useState(false);
       return (
         <>
           <Button onClick={() => setIsOpen(true)}>Открыть</Button>
@@ -32,20 +32,18 @@ describe('Integration Tests', () => {
             <Button>Сохранить</Button>
           </Modal>
         </>
-      )
-    }
+      );
+    };
 
-    render(<TestComponent />)
+    render(<TestComponent />);
 
-    // Модалка закрыта
-    expect(screen.queryByText('Email')).not.toBeInTheDocument()
+    expect(screen.queryByText('Email')).not.toBeInTheDocument();
 
-    // Открываем модалку
-    fireEvent.click(screen.getByText('Открыть'))
-    expect(screen.getByText('Email')).toBeInTheDocument()
-  })
+    fireEvent.click(screen.getByText('Открыть'));
+    expect(screen.getByText('Email')).toBeInTheDocument();
+  });
 
-  test('карточка с кнопками работает', () => {
+  test('card with buttons works', () => {
     render(
       <Card>
         <h3>Заголовок карточки</h3>
@@ -53,17 +51,17 @@ describe('Integration Tests', () => {
         <Button variant="primary">Действие 1</Button>
         <Button variant="outline">Действие 2</Button>
       </Card>
-    )
+    );
 
-    expect(screen.getByText('Заголовок карточки')).toBeInTheDocument()
-    expect(screen.getByText('Описание')).toBeInTheDocument()
-    expect(screen.getByText('Действие 1')).toBeInTheDocument()
-    expect(screen.getByText('Действие 2')).toBeInTheDocument()
-  })
+    expect(screen.getByText('Заголовок карточки')).toBeInTheDocument();
+    expect(screen.getByText('Описание')).toBeInTheDocument();
+    expect(screen.getByText('Действие 1')).toBeInTheDocument();
+    expect(screen.getByText('Действие 2')).toBeInTheDocument();
+  });
 
-  test('валидация инпута с ошибкой', () => {
+  test('input validation with error', () => {
     const TestForm = () => {
-      const [error, setError] = useState('')
+      const [error, setError] = useState('');
       return (
         <div>
           <Input
@@ -71,24 +69,24 @@ describe('Integration Tests', () => {
             error={error}
             onChange={(e) => {
               if (e.target.value.length < 6) {
-                setError('Минимум 6 символов')
+                setError('Минимум 6 символов');
               } else {
-                setError('')
+                setError('');
               }
             }}
           />
           <Button>Отправить</Button>
         </div>
-      )
-    }
+      );
+    };
 
-    render(<TestForm />)
+    render(<TestForm />);
 
-    const input = screen.getByLabelText('Пароль')
-    fireEvent.change(input, { target: { value: '123' } })
-    expect(screen.getByText('Минимум 6 символов')).toBeInTheDocument()
+    const input = screen.getByLabelText('Пароль');
+    fireEvent.change(input, { target: { value: '123' } });
+    expect(screen.getByText('Минимум 6 символов')).toBeInTheDocument();
 
-    fireEvent.change(input, { target: { value: '123456' } })
-    expect(screen.queryByText('Минимум 6 символов')).not.toBeInTheDocument()
-  })
-})
+    fireEvent.change(input, { target: { value: '123456' } });
+    expect(screen.queryByText('Минимум 6 символов')).not.toBeInTheDocument();
+  });
+});
