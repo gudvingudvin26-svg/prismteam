@@ -85,35 +85,62 @@ const CreateQuiz: React.FC = () => {
   };
 
   const validate = (): boolean => {
-    if (!title.trim()) {
-      setError('Введите название квиза');
+  console.log('=== VALIDATE FUNCTION ===');
+  console.log('Title:', title);
+  console.log('Questions length:', questions.length);
+
+  if (!title.trim()) {
+    setError('Введите название квиза');
+    console.log('Failed: title empty');
+    return false;
+  }
+
+  if (questions.length < 2) {
+    setError('Должно быть минимум 2 вопроса');
+    console.log('Failed: less than 2 questions');
+    return false;
+  }
+
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    if (!q.text.trim()) {
+      setError(`Вопрос ${i + 1}: введите текст вопроса`);
+      console.log(`Failed: question ${i + 1} text empty`);
       return false;
     }
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-      if (!q.text.trim()) {
-        setError(`Вопрос ${i + 1}: введите текст вопроса`);
-        return false;
-      }
-      let hasCorrect = false;
-      for (let j = 0; j < q.answers.length; j++) {
-        if (!q.answers[j].text.trim()) {
-          setError(`Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`);
-          return false;
-        }
-        if (q.answers[j].is_correct) hasCorrect = true;
-      }
-      if (!hasCorrect) {
-        setError(`Вопрос ${i + 1}: выберите правильный вариант`);
-        return false;
-      }
+    if (q.answers.length < 2) {
+      setError(`Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`);
+      console.log(`Failed: question ${i + 1} has less than 2 answers`);
+      return false;
     }
-    setError('');
-    return true;
-  };
+    let hasCorrect = false;
+    for (let j = 0; j < q.answers.length; j++) {
+      if (!q.answers[j].text.trim()) {
+        setError(`Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`);
+        console.log(`Failed: question ${i + 1}, answer ${j + 1} empty`);
+        return false;
+      }
+      if (q.answers[j].is_correct) hasCorrect = true;
+    }
+    if (!hasCorrect) {
+      setError(`Вопрос ${i + 1}: выберите правильный вариант`);
+      console.log(`Failed: question ${i + 1} no correct answer`);
+      return false;
+    }
+  }
+  console.log('Validation passed');
+  setError('');
+  return true;
+};
 
   const handleSubmit = async () => {
-    if (!validate()) return;
+    console.log('=== HANDLE SUBMIT ===');
+    if (!validate()) {
+      console.log('Validation failed, aborting');
+      return;
+    }
+    console.log('Validation passed, sending to API');
+
     setLoading(true);
     createdQuizId = null;
 
@@ -124,9 +151,11 @@ const CreateQuiz: React.FC = () => {
         timer: globalTimer,
       });
       createdQuizId = quizRes.data.id;
+      console.log('Quiz created with ID:', createdQuizId);
 
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
+        console.log(`Creating question ${i + 1}:`, q.text);
         await quizzesApi.createQuestion(createdQuizId, {
           text: q.text,
           order: i + 1,
@@ -134,10 +163,12 @@ const CreateQuiz: React.FC = () => {
           answer_options: q.answers.map(a => ({ text: a.text, is_correct: a.is_correct })),
         });
       }
+      console.log('All questions created, navigating to /quizzes');
       navigate('/quizzes');
     } catch (err: any) {
       console.error('Full error:', err);
       if (createdQuizId) {
+        console.log('Deleting quiz due to error, ID:', createdQuizId);
         try {
           await quizzesApi.deleteQuiz(createdQuizId);
         } catch (deleteErr) {
