@@ -1,0 +1,79 @@
+image: python:3.11
+
+stages:
+  - lint
+  - test
+  - build
+  - docs
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+docs:
+  stage: docs
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install sphinx sphinx-autodoc-typehints sphinx_rtd_theme
+  script:
+    - cd docs
+#    - sphinx-apidoc -o source/../backend
+    - make html
+  artifacts:
+    paths:
+      - docs/build/html/
+    expire_in: 1 month
+  only:
+    - main
+
+lint:
+  stage: lint
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install flake8
+  script:
+    - flake8 . --max-line-length=120
+  only:
+    - main
+
+test:
+  stage: test
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -r requirements.txt
+  script:
+    - pytest --cov=my_package --cov-fail-under=70 --cov-report=term --cov-report=html
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    paths:
+      - htmlcov/
+    expire_in: 1 week
+  only:
+    - main
+
+test_count:
+  stage: test
+  script:
+    - pytest --collect-only -q | wc -l
+
+build:
+  stage: build
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install build
+  script:
+    - python -m build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 month
+  only:
+    - main
