@@ -11,6 +11,9 @@ declare global {
 }
 
 const getBaseUrl = () => {
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://prismteam-backend.onrender.com'
+  }
   if (typeof process !== 'undefined' && process.env?.VITE_API_URL) {
     return process.env.VITE_API_URL
   }
