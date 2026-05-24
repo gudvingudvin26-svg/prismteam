@@ -53,7 +53,7 @@ describe('Input Component', () => {
 
   test('input can have different type', () => {
     render(<Input type="password" />);
-    const input = screen.getByPlaceholderText('');
+    const input = screen.getByRole('textbox');
     expect(input).toHaveAttribute('type', 'password');
   });
 });

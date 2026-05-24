@@ -1,8 +1,17 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
 import CreateQuiz from '../components/quiz/CreateQuiz';
 
-jest.mock('../api/quizzes', () => ({
+const renderWithRouter = (component: React.ReactElement) => {
+  return render(
+    <BrowserRouter>
+      {component}
+    </BrowserRouter>
+  );
+};
+
+jest.mock('../../api/quizzes', () => ({
   quizzesApi: {
     createQuiz: jest.fn().mockResolvedValue({ data: { id: 1 } }),
     createQuestion: jest.fn().mockResolvedValue({})
@@ -11,19 +20,19 @@ jest.mock('../api/quizzes', () => ({
 
 describe('CreateQuiz', () => {
   test('renders create quiz form', () => {
-    render(<CreateQuiz />);
+    renderWithRouter(<CreateQuiz />);
     expect(screen.getByText('Создание нового квиза')).toBeInTheDocument();
   });
 
   test('shows error when title is empty on submit', () => {
-    render(<CreateQuiz />);
+    renderWithRouter(<CreateQuiz />);
     const submitButton = screen.getByText('Сохранить квиз');
     fireEvent.click(submitButton);
     expect(screen.getByText('Введите название квиза')).toBeInTheDocument();
   });
 
   test('shows error when less than 2 questions', () => {
-    render(<CreateQuiz />);
+    renderWithRouter(<CreateQuiz />);
     const titleInput = screen.getByLabelText('Название квиза');
     fireEvent.change(titleInput, { target: { value: 'Test Quiz' } });
 
@@ -34,7 +43,7 @@ describe('CreateQuiz', () => {
   });
 
   test('adds new question when clicking add question button', () => {
-    render(<CreateQuiz />);
+    renderWithRouter(<CreateQuiz />);
     const addButton = screen.getByText('+ Добавить вопрос');
     fireEvent.click(addButton);
     fireEvent.click(addButton);
@@ -42,7 +51,7 @@ describe('CreateQuiz', () => {
   });
 
   test('validation passes with valid data', () => {
-    render(<CreateQuiz />);
+    renderWithRouter(<CreateQuiz />);
 
     const titleInput = screen.getByLabelText('Название квиза');
     fireEvent.change(titleInput, { target: { value: 'Valid Quiz' } });
