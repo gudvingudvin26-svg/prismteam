@@ -12,39 +12,41 @@ describe('Card Component', () => {
   });
 
   test('applies base classes', () => {
-    render(<Card>Контент</Card>);
-    const card = screen.getByText('Контент').parentElement;
-    expect(card?.className).toContain('bg-white rounded-lg shadow-md');
+    const { container } = render(<Card>Контент</Card>);
+    const cardDiv = container.firstChild as HTMLElement;
+    expect(cardDiv.className).toContain('bg-white');
+    expect(cardDiv.className).toContain('rounded-lg');
+    expect(cardDiv.className).toContain('shadow-md');
   });
 
   test('applies padding sm', () => {
-    render(<Card padding="sm">Контент</Card>);
-    const card = screen.getByText('Контент').parentElement;
-    expect(card?.className).toContain('p-3');
+    const { container } = render(<Card padding="sm">Контент</Card>);
+    const cardDiv = container.firstChild as HTMLElement;
+    expect(cardDiv.className).toContain('p-3');
   });
 
   test('applies padding md by default', () => {
-    render(<Card>Контент</Card>);
-    const card = screen.getByText('Контент').parentElement;
-    expect(card?.className).toContain('p-5');
+    const { container } = render(<Card>Контент</Card>);
+    const cardDiv = container.firstChild as HTMLElement;
+    expect(cardDiv.className).toContain('p-5');
   });
 
   test('applies padding lg', () => {
-    render(<Card padding="lg">Контент</Card>);
-    const card = screen.getByText('Контент').parentElement;
-    expect(card?.className).toContain('p-8');
+    const { container } = render(<Card padding="lg">Контент</Card>);
+    const cardDiv = container.firstChild as HTMLElement;
+    expect(cardDiv.className).toContain('p-8');
   });
 
   test('applies padding none', () => {
-    render(<Card padding="none">Контент</Card>);
-    const card = screen.getByText('Контент').parentElement;
-    expect(card?.className).toContain('p-0');
+    const { container } = render(<Card padding="none">Контент</Card>);
+    const cardDiv = container.firstChild as HTMLElement;
+    expect(cardDiv.className).toContain('p-0');
   });
 
   test('applies additional className', () => {
-    render(<Card className="custom-class">Контент</Card>);
-    const card = screen.getByText('Контент').parentElement;
-    expect(card?.className).toContain('custom-class');
+    const { container } = render(<Card className="custom-class">Контент</Card>);
+    const cardDiv = container.firstChild as HTMLElement;
+    expect(cardDiv.className).toContain('custom-class');
   });
 
   test('renders complex children', () => {

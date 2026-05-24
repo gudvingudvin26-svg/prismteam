@@ -47,11 +47,13 @@ describe('Input Component', () => {
 
   test('input has type text by default', () => {
     render(<Input />);
-    expect(screen.getByRole('textbox')).toHaveAttribute('type', 'text');
+    const input = screen.getByRole('textbox');
+    expect(input).toHaveAttribute('type', 'text');
   });
 
   test('input can have different type', () => {
     render(<Input type="password" />);
-    expect(screen.getByLabelText('input')).toHaveAttribute('type', 'password');
+    const input = screen.getByPlaceholderText('');
+    expect(input).toHaveAttribute('type', 'password');
   });
 });
