@@ -163,6 +163,7 @@ class QuizViewSet(viewsets.ModelViewSet):
         quiz = self.get_object()
         try:
             validate_quiz_integrity(quiz, use_drf_exception=True)
+            quiz_log.info(f'user with username {request.user.username} published quiz "{quiz.title}" successfully')
             return Response({"status": "Квиз успешно прошел валидацию и готов к публикации."},
                             status=status.HTTP_200_OK)
         except ValidationError as e:

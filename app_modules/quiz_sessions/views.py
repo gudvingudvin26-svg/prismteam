@@ -1,5 +1,6 @@
 import random
 import string
+import logging
 from django.utils import timezone
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
@@ -8,6 +9,7 @@ from .models import QuizSession, ParticipantAnswer
 from .serializers import QuizSessionSerializer
 from app_modules.quiz.models import Question, AnswerOption
 
+quiz_log = logging.getLogger('quiz_log')
 
 class QuizSessionViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSessionSerializer
@@ -33,7 +35,9 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session = QuizSession.objects.get(code=code)
             session.participant_name = nickname
             session.save()
+
             print(f"Session {session.id} updated with name: {nickname}")
+            quiz_log.info(f"Session {session.id} updated with name: {nickname} successfully")
             return Response({'session_id': session.id, 'code': session.code})
         except QuizSession.DoesNotExist:
             print(f"Session with code {code} not found")
@@ -45,6 +49,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         session.status = 'active'
         session.started_at = timezone.now()
         session.save()
+        quiz_log.info(f"Session {session.id} started successfully")
         return Response({'status': 'started'})
 
     @action(detail=True, methods=['post'])
@@ -53,6 +58,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         session.status = 'completed'
         session.ended_at = timezone.now()
         session.save()
+        quiz_log.info(f"Session {session.id} ended successfully")
         return Response({'status': 'completed'})
 
     @action(detail=True, methods=['post'])

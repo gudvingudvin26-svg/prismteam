@@ -2,8 +2,9 @@ from rest_framework import serializers
 
 from .models import User, Question, AnswerOption, Quiz
 from .validators import validate_answer_options_data
+import logging
 
-
+quiz_log = logging.getLogger('quiz_log')
 # === Auth-модуль ===
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -62,6 +63,7 @@ class QuestionSerializer(serializers.ModelSerializer):
             AnswerOption.objects.bulk_create([
                 AnswerOption(question=instance, **opt) for opt in options_data
             ])
+        quiz_log(f'Organizer updated question in the quiz "{instance.title}" successfully')
         return instance
 
 

@@ -115,14 +115,14 @@ LOGGING = {
             "filters": ["info_or_error"],
             "class": "logging.FileHandler",
             "formatter": "simple",
-            "filename": os.path.join(LOG_DIR, "login.log"),
+            "filename": "app_modules/quiz/Logging/login.log",
         },
         "quiz_log": {
             "level": "INFO",
             "filters": ["info_or_error"],
             "class": "logging.FileHandler",
             "formatter": "simple",
-            "filename": os.path.join(LOG_DIR, "quiz.log"),
+            "filename": "app_modules/quiz/Logging/quiz.log",
         }
     },
     'loggers': {
