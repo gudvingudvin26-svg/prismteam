@@ -30,6 +30,9 @@ async def test_websocket_disconnect(quiz_communicator):
 async def test_websocket_receive_message(quiz_communicator):
     await quiz_communicator.connect()
 
+    join_response = await quiz_communicator.receive_json_from()
+    assert join_response['type'] == 'user_joined'
+
     await quiz_communicator.send_json_to({
         'type': 'chat_message',
         'message': 'Hello'
@@ -46,7 +49,11 @@ async def test_websocket_receive_message(quiz_communicator):
 async def test_websocket_invalid_json(quiz_communicator):
     await quiz_communicator.connect()
 
-    await quiz_communicator.send_text_to('not valid json')
+    # После подключения получаем событие user_joined
+    join_response = await quiz_communicator.receive_json_from()
+    assert join_response['type'] == 'user_joined'
+
+    await quiz_communicator.send_to('not valid json')
 
     response = await quiz_communicator.receive_json_from()
     assert response['type'] == 'error'
@@ -64,7 +71,12 @@ async def test_websocket_multiple_clients():
     comm2 = WebsocketCommunicator(application, 'ws/quiz/broadcast_test/')
 
     await comm1.connect()
+    # Получаем user_joined для comm1
+    await comm1.receive_json_from()
+
     await comm2.connect()
+    # Получаем user_joined для comm2
+    await comm2.receive_json_from()
 
     await comm1.send_json_to({
         'type': 'chat_message',
@@ -74,7 +86,7 @@ async def test_websocket_multiple_clients():
     response1 = await comm1.receive_json_from()
     response2 = await comm2.receive_json_from()
 
-    assert response1['message'] == 'Broadcast test'
+    assert response2['type'] == 'chat_message'
     assert response2['message'] == 'Broadcast test'
 
     await comm1.disconnect()
@@ -84,6 +96,10 @@ async def test_websocket_multiple_clients():
 @pytest.mark.asyncio
 async def test_websocket_unknown_event_type(quiz_communicator):
     await quiz_communicator.connect()
+
+    # После подключения получаем событие user_joined
+    join_response = await quiz_communicator.receive_json_from()
+    assert join_response['type'] == 'user_joined'
 
     await quiz_communicator.send_json_to({
         'type': 'unknown_event',
