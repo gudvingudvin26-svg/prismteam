@@ -12,8 +12,16 @@ const Dashboard: React.FC = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalQuizzes: 0, totalParticipants: 0 });
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => setIsInitialized(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+
     const fetchData = async () => {
       try {
         const response = await quizzesApi.getMyQuizzes();
@@ -25,12 +33,17 @@ const Dashboard: React.FC = () => {
         });
       } catch (error) {
         console.error('Ошибка загрузки квизов:', error);
+        if (error.response?.status === 401) {
+          authApi.logout();
+          setUser(null);
+          navigate('/login');
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, []);
+  }, [isInitialized, navigate, setUser]);
 
   const handleLogout = () => {
     authApi.logout();
@@ -38,8 +51,12 @@ const Dashboard: React.FC = () => {
     navigate('/');
   };
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-screen">Загрузка...</div>;
+  if (loading || !isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
+        <div className="text-white text-xl">Загрузка панели управления...</div>
+      </div>
+    );
   }
 
   return (
@@ -58,7 +75,7 @@ const Dashboard: React.FC = () => {
             <Link to="/dashboard" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Обзор</Link>
             <Link to="/quizzes" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Квизы</Link>
             <Link to="/quizzes/create" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Создать</Link>
-            <Link to="/quizzes" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Статистика</Link>
+            <Link to="/join" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Присоединиться</Link>
           </nav>
         </aside>
 

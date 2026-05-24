@@ -1,8 +1,3 @@
-/**
- * @fileoverview Компонент для защиты маршрутов, требующих авторизации.
- * Если пользователь не авторизован, перенаправляет на страницу входа.
- */
-
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
@@ -11,14 +6,23 @@ interface PrivateRouteProps {
   children: React.ReactNode;
 }
 
-/**
- * Компонент-обёртка для приватных маршрутов
- * @param children Дочерние элементы (страница, которую нужно защитить)
- * @returns {JSX.Element} Дочерние элементы или редирект на /login
- */
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   const user = useAppStore((state) => state.user);
   const token = localStorage.getItem('accessToken');
+  const [isChecking, setIsChecking] = React.useState(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsChecking(false), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
+        <div className="text-white text-xl">Проверка авторизации...</div>
+      </div>
+    );
+  }
 
   if (!token || !user) {
     return <Navigate to="/login" replace />;
