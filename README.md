@@ -51,7 +51,7 @@
 
 ```bash
 # Клонировать репозиторий
-git clone https://github.com/gudvingudvin26-svg/prismteam.git
+git clone https://gitlab.informatics.ru/2025-2026/vk/s109m/final-projects/prismteam.git
 cd prismteam
 
 # Скопировать пример переменных окружения
