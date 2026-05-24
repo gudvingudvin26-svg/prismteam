@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Input from '../ui/Input';
 import Button from '../ui/Button';
 
 interface QuestionFormProps {
