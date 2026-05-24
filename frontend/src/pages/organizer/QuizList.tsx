@@ -10,6 +10,7 @@ const QuizList: React.FC = () => {
   const user = useAppStore((state) => state.user);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [sessionCode, setSessionCode] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
@@ -19,11 +20,21 @@ const QuizList: React.FC = () => {
   }, []);
 
   const loadQuizzes = async () => {
+    setLoading(true);
+    setError('');
     try {
       const res = await quizzesApi.getMyQuizzes();
       setQuizzes(res.data);
-    } catch (error) {
-      console.error(error);
+    } catch (err: any) {
+      const status = err.response?.status;
+      if (status === 401) {
+        navigate('/login');
+      } else if (status === 403) {
+        setError('У вас нет доступа к этому списку');
+      } else {
+        setError('Ошибка загрузки квизов');
+      }
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -31,8 +42,19 @@ const QuizList: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     if (confirm('Удалить квиз? Все связанные сессии и ответы будут удалены.')) {
-      await quizzesApi.deleteQuiz(id);
-      await loadQuizzes();
+      try {
+        await quizzesApi.deleteQuiz(id);
+        await loadQuizzes();
+      } catch (err: any) {
+        const status = err.response?.status;
+        if (status === 403) {
+          setError('У вас нет прав на удаление этого квиза');
+        } else if (status === 404) {
+          setError('Квиз не найден');
+        } else {
+          setError('Ошибка при удалении');
+        }
+      }
     }
   };
 
@@ -47,9 +69,18 @@ const QuizList: React.FC = () => {
       await sessionsApi.joinSession(res.data.code, participantName);
 
       setModalOpen(true);
-    } catch (error) {
-      console.error(error);
-      alert('Не удалось создать сессию');
+    } catch (err: any) {
+      const status = err.response?.status;
+      if (status === 401) {
+        navigate('/login');
+      } else if (status === 403) {
+        setError('У вас нет прав на создание сессии для этого квиза');
+      } else if (status === 404) {
+        setError('Квиз не найден');
+      } else {
+        setError('Не удалось создать сессию');
+      }
+      console.error(err);
     }
   };
 
@@ -60,6 +91,18 @@ const QuizList: React.FC = () => {
   };
 
   if (loading) return <div className="flex justify-center items-center h-screen text-white">Загрузка...</div>;
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
+        <Card className="p-8 text-center max-w-md bg-white/90 backdrop-blur-sm">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Ошибка</h2>
+          <p className="text-gray-700 mb-6">{error}</p>
+          <Button onClick={() => loadQuizzes()}>Повторить</Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
@@ -80,7 +123,7 @@ const QuizList: React.FC = () => {
             {quizzes.map((quiz) => (
               <Card key={quiz.id} className="p-5 bg-white/90 backdrop-blur-sm">
                 <h3 className="text-xl font-semibold mb-2 text-gray-900">{quiz.title}</h3>
-                <p className="text-gray-600 mb-4">{quiz.description}</p>
+                <p className="text-gray-600 mb-4">{quiz.description || 'Без описания'}</p>
                 <div className="text-sm text-gray-500 mb-4">
                   Создан: {new Date(quiz.created_at || Date.now()).toLocaleDateString()}
                 </div>

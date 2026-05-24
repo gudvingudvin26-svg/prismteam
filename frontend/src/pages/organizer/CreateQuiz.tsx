@@ -85,12 +85,12 @@ const CreateQuiz: React.FC = () => {
   };
 
   const validate = (): boolean => {
-    if (!title.trim()) {
-      setError('Введите название квиза');
-      return false;
-    }
     if (questions.length < 2) {
       setError('Добавьте хотя бы два вопроса');
+      return false;
+    }
+    if (!title.trim()) {
+      setError('Введите название квиза');
       return false;
     }
     for (let i = 0; i < questions.length; i++) {
@@ -124,6 +124,7 @@ const CreateQuiz: React.FC = () => {
     if (!validate()) return;
     setLoading(true);
     setCreatedQuizId(null);
+    setError('');
 
     try {
       const quizRes = await quizzesApi.createQuiz({
@@ -148,6 +149,7 @@ const CreateQuiz: React.FC = () => {
       navigate('/quizzes');
     } catch (err: any) {
       console.error('Full error:', err);
+
       if (createdQuizId) {
         try {
           await quizzesApi.deleteQuiz(createdQuizId);
@@ -155,8 +157,14 @@ const CreateQuiz: React.FC = () => {
           console.error('Failed to delete quiz:', deleteErr);
         }
       }
-      if (err.response) {
-        console.error('Error response data:', err.response.data);
+
+      const status = err.response?.status;
+      if (status === 401) {
+        setError('Сессия истекла. Войдите снова');
+        navigate('/login');
+      } else if (status === 403) {
+        setError('У вас нет прав на создание квиза');
+      } else if (err.response) {
         setError(`Ошибка: ${JSON.stringify(err.response.data)}`);
       } else {
         setError('Ошибка при создании квиза. Попробуйте позже.');

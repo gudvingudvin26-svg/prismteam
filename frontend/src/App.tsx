@@ -10,6 +10,8 @@ import Results from './pages/Results';
 import QuizList from './pages/organizer/QuizList';
 import CreateQuiz from './pages/organizer/CreateQuiz';
 import Stats from './pages/Stats';
+import AccessDenied from './pages/AccessDenied';
+import NotFound from './pages/NotFound';
 
 function App() {
   return (
@@ -21,6 +23,8 @@ function App() {
         <Route path="/join" element={<JoinQuiz />} />
         <Route path="/play/:sessionId" element={<QuizSession />} />
         <Route path="/results/:sessionId" element={<Results />} />
+        <Route path="/access-denied" element={<AccessDenied />} />
+        <Route path="/not-found" element={<NotFound />} />
 
         <Route
           path="/dashboard"
@@ -63,7 +67,7 @@ function App() {
           }
         />
 
-        <Route path="*" element={<div className="p-6 text-center">404 - Страница не найдена</div>} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );

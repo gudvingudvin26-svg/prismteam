@@ -52,6 +52,16 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
+    if (error.response?.status === 404 && !originalRequest.url?.includes('/auth/')) {
+      if (originalRequest.url?.includes('/quizzes/')) {
+        window.location.href = '/quiz-not-found'
+      }
+    }
+
+    if (error.response?.status === 403) {
+      window.location.href = '/access-denied'
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
 

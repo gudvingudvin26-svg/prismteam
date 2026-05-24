@@ -20,6 +20,7 @@ const Login: React.FC = () => {
     }
 
     setLoading(true);
+    setError('');
     try {
       const response = await authApi.login(email, password);
       const { access, refresh, user } = response.data;
@@ -27,8 +28,16 @@ const Login: React.FC = () => {
       setUser(user);
       navigate('/dashboard');
     } catch (err: any) {
+      const status = err.response?.status;
       const data = err.response?.data;
-      setError(data?.detail || data?.message || 'Ошибка входа. Проверьте email и пароль.');
+
+      if (status === 401) {
+        setError('Неверный email или пароль');
+      } else if (status === 404) {
+        setError('Пользователь с таким email не найден');
+      } else {
+        setError(data?.detail || data?.message || data?.error || 'Ошибка входа. Проверьте email и пароль.');
+      }
     } finally {
       setLoading(false);
     }
