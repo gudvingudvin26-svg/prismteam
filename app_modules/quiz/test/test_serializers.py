@@ -1,3 +1,4 @@
+import uuid
 from django.test import TestCase
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
@@ -8,7 +9,11 @@ from app_modules.quiz.serializers import QuizSerializer, QuestionSerializer, Ans
 class TestSerializers(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="org", password="pass")
+        cls.user = User.objects.create_user(
+            username="org",
+            email=f"org_{uuid.uuid4()}@test.com",
+            password="pass"
+        )
         cls.quiz = Quiz.objects.create(title="Test Quiz", created_by=cls.user)
         cls.question = Question.objects.create(quiz=cls.quiz, text="Capital of France?", order=1)
         cls.opt1 = AnswerOption.objects.create(question=cls.question, text="Paris", is_correct=True)

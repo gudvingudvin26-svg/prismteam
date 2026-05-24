@@ -1,3 +1,4 @@
+import uuid
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
@@ -27,8 +28,16 @@ class _AnswerOptionModelSerializer(AnswerOptionSerializer):
 class QuizAPITest(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user1 = User.objects.create_user(username="org1", password="pass1")
-        cls.user2 = User.objects.create_user(username="org2", password="pass2")
+        cls.user1 = User.objects.create_user(
+            username="org1",
+            email=f"org1_{uuid.uuid4()}@test.com",
+            password="pass1"
+        )
+        cls.user2 = User.objects.create_user(
+            username="org2",
+            email=f"org2_{uuid.uuid4()}@test.com",
+            password="pass2"
+        )
         cls.client1 = APIClient()
         cls.client2 = APIClient()
         cls.client1.force_authenticate(user=cls.user1)
@@ -78,8 +87,16 @@ class QuizAPITest(APITestCase):
 class QuestionAPITest(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.org1 = User.objects.create_user(username="org1", password="p")
-        cls.org2 = User.objects.create_user(username="org2", password="p")
+        cls.org1 = User.objects.create_user(
+            username="org1",
+            email=f"org1_{uuid.uuid4()}@test.com",
+            password="p"
+        )
+        cls.org2 = User.objects.create_user(
+            username="org2",
+            email=f"org2_{uuid.uuid4()}@test.com",
+            password="p"
+        )
         cls.client1 = APIClient()
         cls.client1.force_authenticate(user=cls.org1)
 
@@ -126,7 +143,11 @@ class QuestionAPITest(APITestCase):
 class AnswerOptionAPITest(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.org = User.objects.create_user(username="org", password="p")
+        cls.org = User.objects.create_user(
+            username="org",
+            email=f"org_{uuid.uuid4()}@test.com",
+            password="p"
+        )
         cls.quiz = Quiz.objects.create(title="Quiz", created_by=cls.org)
         cls.question = Question.objects.create(quiz=cls.quiz, text="Test question?", order=1)
         cls.option = AnswerOption.objects.create(question=cls.question, text="Opt", is_correct=True)

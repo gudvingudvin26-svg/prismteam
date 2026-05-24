@@ -56,7 +56,7 @@ describe('QuestionForm', () => {
       />
     );
 
-    const textInput = screen.getByRole('textbox', { name: /Текст вопроса/i });
+    const textInput = screen.getByLabelText('Текст вопроса');
     fireEvent.change(textInput, { target: { value: 'New question' } });
 
     expect(mockOnChange).toHaveBeenCalledWith({
@@ -94,7 +94,7 @@ describe('QuestionForm', () => {
       />
     );
 
-    const textInput = screen.getByRole('textbox', { name: /Текст вопроса/i });
+    const textInput = screen.getByLabelText('Текст вопроса');
     fireEvent.blur(textInput);
 
     expect(screen.getByText('Текст вопроса обязателен')).toBeInTheDocument();

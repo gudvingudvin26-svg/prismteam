@@ -1,4 +1,4 @@
-import secrets
+import uuid
 from django.test import TestCase
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -10,7 +10,11 @@ from app_modules.quiz.validators import validate_answer_options_data, validate_q
 class TestModels(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="organizer", password="testpass")
+        cls.user = User.objects.create_user(
+            username="organizer",
+            email=f"organizer_{uuid.uuid4()}@test.com",
+            password="testpass"
+        )
         cls.quiz = Quiz.objects.create(title="Django Quiz", created_by=cls.user)
         cls.question = Question.objects.create(quiz=cls.quiz, text="What is Python?", order=1)
         cls.ans1 = AnswerOption.objects.create(question=cls.question, text="Snake", is_correct=True)
@@ -60,7 +64,11 @@ class TestValidators(TestCase):
             {"text": "A", "is_correct": True},
             {"text": "B", "is_correct": False},
         ]
-        self.user = User.objects.create_user(username="u", password="p")
+        self.user = User.objects.create_user(
+            username="u",
+            email=f"u_{uuid.uuid4()}@test.com",
+            password="p"
+        )
         self.quiz = Quiz.objects.create(title="Test", created_by=self.user)
 
         self.q = Question.objects.create(quiz=self.quiz, text="Valid question text?", order=1)

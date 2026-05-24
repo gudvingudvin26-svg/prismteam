@@ -22,7 +22,7 @@ describe('CreateQuiz', () => {
     expect(screen.getByText('Введите название квиза')).toBeInTheDocument();
   });
 
-  test('shows error when no questions added', () => {
+  test('shows error when less than 2 questions', () => {
     render(<CreateQuiz />);
     const titleInput = screen.getByLabelText('Название квиза');
     fireEvent.change(titleInput, { target: { value: 'Test Quiz' } });
@@ -37,7 +37,8 @@ describe('CreateQuiz', () => {
     render(<CreateQuiz />);
     const addButton = screen.getByText('+ Добавить вопрос');
     fireEvent.click(addButton);
-    expect(screen.getByText('Вопрос 1')).toBeInTheDocument();
+    fireEvent.click(addButton);
+    expect(screen.getAllByText(/Вопрос \d+/).length).toBe(2);
   });
 
   test('validation passes with valid data', () => {
