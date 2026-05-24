@@ -57,7 +57,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          Route path="/join" element={<JoinQuiz />} />
+          <Route path="/join" element={<JoinQuiz />} />
           <Route path="/play/:sessionId" element={<QuizSession />} />
           <Route path="/results/:sessionId" element={<Results />} />
           <Route path="/access-denied" element={<AccessDenied />} />
