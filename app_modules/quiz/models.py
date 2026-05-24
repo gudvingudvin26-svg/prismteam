@@ -7,11 +7,10 @@ from django.core.validators import MinLengthValidator
 from django.core.exceptions import ValidationError
 
 
-# === Модели из auth-модуля ===
-
 class User(AbstractUser):
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=13, blank=True, null=True, unique=True)
+    jwt_token = models.CharField(max_length=500, blank=True, null=True)
 
     def __str__(self):
         return self.username
@@ -30,9 +29,6 @@ def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
 
-
-# === Модели из quiz-constructor ===
-# Везде используется кастомная модель User, определённая выше
 
 def generate_token():
     return secrets.token_urlsafe(16)[:16]
