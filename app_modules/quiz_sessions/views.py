@@ -16,7 +16,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSessionSerializer
 
     def get_permissions(self):
-        if self.action in ['join', 'retrieve', 'answer', 'my_result', 'results']:
+        if self.action in ['join', 'retrieve', 'answer', 'my_result', 'results', 'questions_stats']:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
@@ -185,15 +185,19 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
         from collections import defaultdict
         scores = defaultdict(int)
+        participant_names = defaultdict(str)
+
         for s in all_sessions:
             correct = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
             scores[s.id] = correct
+            if s.participant_name:
+                participant_names[s.id] = s.participant_name
 
         sorted_sessions = sorted(all_sessions, key=lambda x: scores[x.id], reverse=True)
 
         results = []
         for i, s in enumerate(sorted_sessions):
-            display_name = s.participant_name if s.participant_name else f'Участник {s.id}'
+            display_name = participant_names.get(s.id, f'Участник {s.id}')
             results.append({
                 'id': s.id,
                 'participant_name': display_name,
@@ -203,6 +207,31 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             })
 
         return Response(results)
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
+    def questions_stats(self, request, pk=None):
+        try:
+            session = QuizSession.objects.get(id=pk)
+        except QuizSession.DoesNotExist:
+            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        questions = session.quiz.questions.all()
+
+        stats = []
+        for q in questions:
+            answers = ParticipantAnswer.objects.filter(session=session, question=q)
+            total = answers.count()
+            correct = answers.filter(is_correct=True).count()
+
+            stats.append({
+                'question_id': q.id,
+                'question_text': q.text,
+                'total_answers': total,
+                'correct_count': correct,
+                'correct_percent': round(correct / total * 100, 1) if total > 0 else 0
+            })
+
+        return Response(stats)
 
     def retrieve(self, request, *args, **kwargs):
         try:
