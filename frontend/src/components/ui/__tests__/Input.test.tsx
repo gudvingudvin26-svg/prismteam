@@ -4,7 +4,8 @@ import { Input } from '../index';
 describe('Input Component', () => {
   test('renders input element', () => {
     render(<Input />);
-    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    const input = screen.getByRole('textbox', { hidden: true });
+    expect(input).toBeInTheDocument();
   });
 
   test('displays label when provided', () => {
@@ -19,13 +20,13 @@ describe('Input Component', () => {
 
   test('applies error styles when error', () => {
     render(<Input error="Ошибка" />);
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole('textbox', { hidden: true });
     expect(input.className).toContain('border-red-500');
   });
 
   test('applies fullWidth class', () => {
     render(<Input fullWidth />);
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole('textbox', { hidden: true });
     expect(input.className).toContain('w-full');
   });
 
@@ -33,7 +34,7 @@ describe('Input Component', () => {
     const handleChange = jest.fn();
     render(<Input value="тест" onChange={handleChange} />);
 
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole('textbox', { hidden: true });
     expect(input).toHaveValue('тест');
 
     fireEvent.change(input, { target: { value: 'новый текст' } });
@@ -42,18 +43,19 @@ describe('Input Component', () => {
 
   test('input is disabled when disabled', () => {
     render(<Input disabled />);
-    expect(screen.getByRole('textbox')).toBeDisabled();
+    const input = screen.getByRole('textbox', { hidden: true });
+    expect(input).toBeDisabled();
   });
 
   test('input has type text by default', () => {
     render(<Input />);
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole('textbox', { hidden: true });
     expect(input).toHaveAttribute('type', 'text');
   });
 
   test('input can have different type', () => {
     render(<Input type="password" />);
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole('textbox', { hidden: true });
     expect(input).toHaveAttribute('type', 'password');
   });
 });

@@ -11,7 +11,7 @@ const renderWithRouter = (component: React.ReactElement) => {
   );
 };
 
-jest.mock('../../api/quizzes', () => ({
+jest.mock('../api/quizzes', () => ({
   quizzesApi: {
     createQuiz: jest.fn().mockResolvedValue({ data: { id: 1 } }),
     createQuestion: jest.fn().mockResolvedValue({})
