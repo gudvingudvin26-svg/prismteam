@@ -1,5 +1,14 @@
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom'
 
-window._env_ = {
-  VITE_API_URL: 'http://localhost:8000'
-};
+declare global {
+  interface Window {
+    _env_: {
+      VITE_API_URL?: string
+      [key: string]: string | undefined
+    }
+  }
+}
+
+if (!window._env_) {
+  window._env_ = {}
+}

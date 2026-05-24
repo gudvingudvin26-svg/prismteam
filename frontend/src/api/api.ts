@@ -1,5 +1,14 @@
 import axios from 'axios'
 
+declare global {
+  interface Window {
+    _env_: {
+      VITE_API_URL?: string
+      [key: string]: string | undefined
+    }
+  }
+}
+
 const getBaseUrl = () => {
   if (typeof process !== 'undefined' && process.env?.VITE_API_URL) {
     return process.env.VITE_API_URL
