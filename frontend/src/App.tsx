@@ -1,6 +1,8 @@
 ﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import PrivateRoute from './components/PrivateRoute';
+import { authApi } from './api';
+import { useAppStore } from './store/appStore';
 
 const Home = lazy(() => import('./pages/Home'));
 const Login = lazy(() => import('./pages/Login'));
@@ -22,6 +24,32 @@ const LoadingSpinner = () => (
 );
 
 function App() {
+  const setUser = useAppStore((state) => state.setUser);
+  const [isAppLoading, setIsAppLoading] = useState(true);
+
+  useEffect(() => {
+    const restoreUser = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        try {
+          const response = await authApi.getCurrentUser();
+          setUser(response.data);
+        } catch (error) {
+          console.error('Ошибка восстановления пользователя:', error);
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        }
+      }
+      setIsAppLoading(false);
+    };
+
+    restoreUser();
+  }, [setUser]);
+
+  if (isAppLoading) {
+    return <LoadingSpinner />;
+  }
+
   return (
     <BrowserRouter>
       <Suspense fallback={<LoadingSpinner />}>
