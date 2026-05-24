@@ -85,12 +85,12 @@ const CreateQuiz: React.FC = () => {
   };
 
   const validate = (): boolean => {
-    if (!title.trim()) {
-      setError('Введите название квиза');
+    if (questions.length < 2) {
+      setError('Добавьте хотя бы два вопроса');
       return false;
     }
-    if (questions.length === 0) {
-      setError('Добавьте хотя бы один вопрос');
+    if (!title.trim()) {
+      setError('Введите название квиза');
       return false;
     }
     for (let i = 0; i < questions.length; i++) {

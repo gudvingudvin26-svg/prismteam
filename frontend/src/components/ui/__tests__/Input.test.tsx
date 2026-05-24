@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Input } from '../index';
+import Input from '../Input';
 
 describe('Input Component', () => {
   test('renders input element', () => {
@@ -27,7 +27,8 @@ describe('Input Component', () => {
   test('applies fullWidth class', () => {
     render(<Input fullWidth />);
     const input = screen.getByRole('textbox', { hidden: true });
-    expect(input.className).toContain('w-full');
+    const wrapper = input.closest('.w-full');
+    expect(wrapper).toBeInTheDocument();
   });
 
   test('passes value and onChange', () => {
@@ -55,7 +56,7 @@ describe('Input Component', () => {
 
   test('input can have different type', () => {
     render(<Input type="password" />);
-    const input = screen.getByRole('textbox', { hidden: true });
+    const input = document.querySelector('input[type="password"]');
     expect(input).toHaveAttribute('type', 'password');
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
 import CreateQuiz from '../components/quiz/CreateQuiz';
@@ -14,7 +14,8 @@ const renderWithRouter = (component: React.ReactElement) => {
 jest.mock('../api/quizzes', () => ({
   quizzesApi: {
     createQuiz: jest.fn().mockResolvedValue({ data: { id: 1 } }),
-    createQuestion: jest.fn().mockResolvedValue({})
+    createQuestion: jest.fn().mockResolvedValue({}),
+    deleteQuiz: jest.fn().mockResolvedValue({})
   }
 }));
 
@@ -26,38 +27,44 @@ describe('CreateQuiz', () => {
 
   test('shows error when title is empty on submit', () => {
     renderWithRouter(<CreateQuiz />);
+
+    const addButton = screen.getByText('+ Добавить вопрос');
+    fireEvent.click(addButton);
+
     const submitButton = screen.getByText('Сохранить квиз');
     fireEvent.click(submitButton);
+
     expect(screen.getByText('Введите название квиза')).toBeInTheDocument();
   });
 
-  test('shows error when less than 2 questions', () => {
+  test('shows error when less than 2 questions', async () => {
     renderWithRouter(<CreateQuiz />);
+
     const titleInput = screen.getByLabelText('Название квиза');
     fireEvent.change(titleInput, { target: { value: 'Test Quiz' } });
 
     const submitButton = screen.getByText('Сохранить квиз');
     fireEvent.click(submitButton);
 
-    expect(screen.getByText('Добавьте хотя бы два вопроса')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Добавьте хотя бы два вопроса')).toBeInTheDocument();
+    });
   });
 
   test('adds new question when clicking add question button', () => {
     renderWithRouter(<CreateQuiz />);
     const addButton = screen.getByText('+ Добавить вопрос');
     fireEvent.click(addButton);
-    fireEvent.click(addButton);
     expect(screen.getAllByText(/Вопрос \d+/).length).toBe(2);
   });
 
-  test('validation passes with valid data', () => {
+  test('validation passes with valid data', async () => {
     renderWithRouter(<CreateQuiz />);
 
     const titleInput = screen.getByLabelText('Название квиза');
     fireEvent.change(titleInput, { target: { value: 'Valid Quiz' } });
 
     const addButton = screen.getByText('+ Добавить вопрос');
-    fireEvent.click(addButton);
     fireEvent.click(addButton);
 
     const questionInputs = screen.getAllByLabelText('Текст вопроса');
@@ -66,7 +73,11 @@ describe('CreateQuiz', () => {
 
     const optionInputs = screen.getAllByPlaceholderText(/Вариант 1/);
     fireEvent.change(optionInputs[0], { target: { value: 'Answer 1' } });
-    fireEvent.change(optionInputs[2], { target: { value: 'Answer 1 for Q2' } });
+    fireEvent.change(optionInputs[1], { target: { value: 'Answer 1 for Q2' } });
+
+    const optionInputs2 = screen.getAllByPlaceholderText(/Вариант 2/);
+    fireEvent.change(optionInputs2[0], { target: { value: 'Answer 2' } });
+    fireEvent.change(optionInputs2[1], { target: { value: 'Answer 2 for Q2' } });
 
     const radios = screen.getAllByRole('radio');
     fireEvent.click(radios[0]);
@@ -75,7 +86,9 @@ describe('CreateQuiz', () => {
     const submitButton = screen.getByText('Сохранить квиз');
     fireEvent.click(submitButton);
 
-    expect(screen.queryByText('Введите название квиза')).not.toBeInTheDocument();
-    expect(screen.queryByText('Добавьте хотя бы два вопроса')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('Введите название квиза')).not.toBeInTheDocument();
+      expect(screen.queryByText('Добавьте хотя бы два вопроса')).not.toBeInTheDocument();
+    });
   });
 });
