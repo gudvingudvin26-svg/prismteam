@@ -22,7 +22,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         code = ''.join(random.choices(string.digits, k=6))
         serializer.save(code=code)
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], permission_classes=[], url_path='join')
     def join(self, request):
         code = request.data.get('code')
         nickname = request.data.get('nickname')
@@ -31,17 +31,26 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         print(f"Code: {code}")
         print(f"Nickname: {nickname}")
 
+        if not code:
+            return Response({'error': 'Code is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not nickname:
+            return Response({'error': 'Nickname is required'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            session = QuizSession.objects.get(code=code)
+            session = QuizSession.objects.get(code=code, status='waiting')
             session.participant_name = nickname
             session.save()
 
             print(f"Session {session.id} updated with name: {nickname}")
             quiz_log.info(f"Session {session.id} updated with name: {nickname} successfully")
-            return Response({'session_id': session.id, 'code': session.code})
+            return Response({'session_id': session.id, 'code': session.code}, status=status.HTTP_200_OK)
         except QuizSession.DoesNotExist:
             print(f"Session with code {code} not found")
-            return Response({'error': 'Session not found'}, status=404)
+            return Response({'error': 'Сессия с таким кодом не найдена'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['post'], permission_classes=[], url_path='join')
+    def join_session(self, request):
+        return self.join(request)
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):

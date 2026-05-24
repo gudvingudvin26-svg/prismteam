@@ -31,8 +31,9 @@ const Dashboard: React.FC = () => {
           totalQuizzes: myQuizzes.length,
           totalParticipants: 0,
         });
-      } catch (error) {
-        console.error('Ошибка загрузки квизов:', error);
+      } catch (err: unknown) {
+        console.error('Ошибка загрузки квизов:', err);
+        const error = err as { response?: { status?: number } };
         if (error.response?.status === 401) {
           authApi.logout();
           setUser(null);

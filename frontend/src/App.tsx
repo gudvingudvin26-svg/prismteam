@@ -1,74 +1,84 @@
-﻿import { BrowserRouter, Routes, Route } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
 import PrivateRoute from './components/PrivateRoute';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import JoinQuiz from './pages/JoinQuiz';
-import QuizSession from './pages/QuizSession';
-import Results from './pages/Results';
-import QuizList from './pages/organizer/QuizList';
-import CreateQuiz from './pages/organizer/CreateQuiz';
-import Stats from './pages/Stats';
-import AccessDenied from './pages/AccessDenied';
-import NotFound from './pages/NotFound';
+
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const JoinQuiz = lazy(() => import('./pages/JoinQuiz'));
+const QuizSession = lazy(() => import('./pages/QuizSession'));
+const Results = lazy(() => import('./pages/Results'));
+const QuizList = lazy(() => import('./pages/organizer/QuizList'));
+const CreateQuiz = lazy(() => import('./pages/organizer/CreateQuiz'));
+const Stats = lazy(() => import('./pages/Stats'));
+const AccessDenied = lazy(() => import('./pages/AccessDenied'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+const LoadingSpinner = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
+    <div className="text-white text-xl">Загрузка...</div>
+  </div>
+);
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/join" element={<JoinQuiz />} />
-        <Route path="/play/:sessionId" element={<QuizSession />} />
-        <Route path="/results/:sessionId" element={<Results />} />
-        <Route path="/access-denied" element={<AccessDenied />} />
-        <Route path="/not-found" element={<NotFound />} />
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/join" element={<JoinQuiz />} />
+          <Route path="/play/:sessionId" element={<QuizSession />} />
+          <Route path="/results/:sessionId" element={<Results />} />
+          <Route path="/access-denied" element={<AccessDenied />} />
+          <Route path="/not-found" element={<NotFound />} />
 
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/quizzes"
-          element={
-            <PrivateRoute>
-              <QuizList />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/quizzes/create"
-          element={
-            <PrivateRoute>
-              <CreateQuiz />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/quizzes/:id/edit"
-          element={
-            <PrivateRoute>
-              <div>Редактирование квиза (в разработке)</div>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/stats/:sessionId"
-          element={
-            <PrivateRoute>
-              <Stats />
-            </PrivateRoute>
-          }
-        />
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/quizzes"
+            element={
+              <PrivateRoute>
+                <QuizList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/quizzes/create"
+            element={
+              <PrivateRoute>
+                <CreateQuiz />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/quizzes/:id/edit"
+            element={
+              <PrivateRoute>
+                <CreateQuiz />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/stats/:sessionId"
+            element={
+              <PrivateRoute>
+                <Stats />
+              </PrivateRoute>
+            }
+          />
 
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

@@ -22,12 +22,19 @@ const JoinQuiz: React.FC = () => {
     }
 
     setLoading(true);
+    setError('');
     try {
       const response = await sessionsApi.joinSession(code.toUpperCase(), nickname);
       const sessionId = response.data.session_id;
       navigate(`/play/${sessionId}`);
-    } catch (err) {
-      setError('Неверный код или ошибка подключения');
+    } catch (err: any) {
+      const status = err.response?.status;
+      const data = err.response?.data;
+      if (status === 404) {
+        setError('Сессия с таким кодом не найдена');
+      } else {
+        setError(data?.error || 'Ошибка подключения к сессии');
+      }
     } finally {
       setLoading(false);
     }
