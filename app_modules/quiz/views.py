@@ -18,11 +18,9 @@ from .serializers import UserSerializer, QuizSerializer, QuestionSerializer, Ans
 from .validators import validate_quiz_integrity
 
 login_log = logging.getLogger('login_log')
-user = None
 
 class UserRegistration(APIView):
     def post(self, request):
-        global user
         serializer = UserSerializer(data=request.data)
 
         print("DATA:", request.data)
@@ -96,28 +94,30 @@ class UserRegistration(APIView):
 
 class UserLogin(APIView):
     def post(self, request):
-        global user
-        if request.data['identification_parameter'].isdigit():
-            user = User.objects.filter(phone=request.data['identification_parameter']).first()
-        elif request.data['identification_parameter'].count('@') > 0:
-            user = User.objects.filter(email=request.data['identification_parameter']).first()
-        else:
-            user = User.objects.filter(username=request.data['identification_parameter']).first()
-
-        if not user:
-            return Response('User with this username/email/phone does not exist', status=status.HTTP_400_BAD_REQUEST)
-        else:
-            if user.check_password(request.data.get('password')):
-                refresh = RefreshToken.for_user(user)
-                login(request, user)
-                if request.user.is_authenticated:
-                    login_log.info(f'User logged in with username {user.username} successfully')
-                    return render(request, 'main.html')
-                else:
-                    login_log.error(f'User can not log in for some reason')
-                    return Response('User can not log in for some reason', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        try:
+            if request.data['identification_parameter'].isdigit():
+                user = User.objects.filter(phone=request.data['identification_parameter']).first()
+            elif request.data['identification_parameter'].count('@') > 0:
+                user = User.objects.filter(email=request.data['identification_parameter']).first()
             else:
-                return Response('Wrong password', status=status.HTTP_400_BAD_REQUEST)
+                user = User.objects.filter(username=request.data['identification_parameter']).first()
+
+            if not user:
+                return Response('User with this username/email/phone does not exist', status=status.HTTP_400_BAD_REQUEST)
+            else:
+                if user.check_password(request.data.get('password')):
+                    refresh = RefreshToken.for_user(user)
+                    login(request, user)
+                    if request.user.is_authenticated:
+                        login_log.info(f'User logged in with username {user.username} successfully')
+                        return render(request, 'main.html')
+                    else:
+                        login_log.error(f'User can not log in for some reason')
+                        return Response('User can not log in for some reason', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                else:
+                    return Response('Wrong password', status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request):
         if request.user.is_authenticated:
@@ -133,18 +133,11 @@ class Main(APIView):
 
 class UserLogout(APIView):
     def post(self, request):
-        global user
-        username = user.username
-        print(1)
-        logout(request)
-        print(2)
-        if not request.user.is_authenticated:
-            print(3)
-            login_log.info(f'User with username {username} logged out successfully')
-            return redirect('http://127.0.0.1:8000/login/')
-        else:
-            login_log.error(f'User with username {username} can not log out for some reason')
-            return redirect('http://127.0.0.1:8000/main/')
+        if request.user.is_authenticated:
+            username = request.user.username
+            logout(request)
+            login_log.info(f'User {username} logged out successfully')
+        return redirect('/login/')
 
     def get(self, request):
         return redirect('http://127.0.0.1:8000/main/')
