@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import PrivateRoute from './components/PrivateRoute';
 import { authApi } from './api';
@@ -40,7 +40,7 @@ function App() {
           localStorage.removeItem('refreshToken');
         }
       }
-      setIsAppLoading(false);
+      setTimeout(() => setIsAppLoading(false), 100);
     };
 
     restoreUser();
@@ -57,7 +57,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/join" element={<JoinQuiz />} />
+          Route path="/join" element={<JoinQuiz />} />
           <Route path="/play/:sessionId" element={<QuizSession />} />
           <Route path="/results/:sessionId" element={<Results />} />
           <Route path="/access-denied" element={<AccessDenied />} />

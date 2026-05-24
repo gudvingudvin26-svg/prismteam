@@ -1,4 +1,4 @@
-@tailwind base;
+\@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -16,6 +16,7 @@
 
 html, body, #root {
   min-height: 100vh;
+  background: linear-gradient(to bottom right, #4c1d95, #7e22ce, #1e40af);
 }
 
 @keyframes fadeIn {
@@ -29,8 +30,21 @@ html, body, #root {
   }
 }
 
+@keyframes fadeInQuick {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
+}
+
+.fade-quick {
+  animation: fadeInQuick 0.15s ease-in-out;
 }
 
 .loading-screen {
@@ -49,4 +63,26 @@ html, body, #root {
 .loading-screen p {
   color: white;
   font-size: 1.25rem;
+}
+
+#root {
+  background: linear-gradient(to bottom right, #4c1d95, #7e22ce, #1e40af);
+}
+
+.page-enter {
+  opacity: 0;
+}
+
+.page-enter-active {
+  opacity: 1;
+  transition: opacity 150ms ease-in;
+}
+
+.page-exit {
+  opacity: 1;
+}
+
+.page-exit-active {
+  opacity: 0;
+  transition: opacity 150ms ease-in;
 }
