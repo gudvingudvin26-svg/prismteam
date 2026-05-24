@@ -3,6 +3,7 @@ import axios from 'axios'
 declare global {
   interface Window {
     _env_: {
+      API_URL?: string
       VITE_API_URL?: string
       [key: string]: string | undefined
     }
@@ -15,6 +16,9 @@ const getBaseUrl = () => {
   }
   if (typeof window !== 'undefined' && window._env_?.VITE_API_URL) {
     return window._env_.VITE_API_URL
+  }
+  if (typeof window !== 'undefined' && window._env_?.API_URL) {
+    return window._env_.API_URL
   }
   return 'http://localhost:8000'
 }
