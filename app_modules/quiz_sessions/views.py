@@ -11,18 +11,49 @@ from app_modules.quiz.models import Question, AnswerOption
 
 quiz_log = logging.getLogger('quiz_log')
 
+
 class QuizSessionViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSessionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['join', 'retrieve', 'get_current_question']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        return QuizSession.objects.filter(quiz__created_by=self.request.user)
+        if self.request.user.is_authenticated:
+            return QuizSession.objects.filter(quiz__created_by=self.request.user)
+        return QuizSession.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        print("=== CREATE SESSION ===")
+        print("Request data:", request.data)
+        print("User:", request.user)
+
+        quiz_id = request.data.get('quiz')
+        if not quiz_id:
+            return Response({'error': 'quiz_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from app_modules.quiz.models import Quiz
+            quiz = Quiz.objects.get(id=quiz_id, created_by=request.user)
+        except Quiz.DoesNotExist:
+            return Response({'error': 'Quiz not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        code = ''.join(random.choices(string.digits, k=6))
+        session = QuizSession.objects.create(quiz=quiz, code=code, created_by=request.user)
+
+        return Response({
+            'id': session.id,
+            'code': session.code,
+            'quiz': session.quiz.id
+        }, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
         code = ''.join(random.choices(string.digits, k=6))
         serializer.save(code=code)
 
-    @action(detail=False, methods=['post'], permission_classes=[], url_path='join')
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny()], url_path='join')
     def join(self, request):
         code = request.data.get('code')
         nickname = request.data.get('nickname')
@@ -48,9 +79,71 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             print(f"Session with code {code} not found")
             return Response({'error': 'Сессия с таким кодом не найдена'}, status=status.HTTP_404_NOT_FOUND)
 
-    @action(detail=False, methods=['post'], permission_classes=[], url_path='join')
-    def join_session(self, request):
-        return self.join(request)
+    @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny()], url_path='question')
+    def get_current_question(self, request):
+        session_id = request.GET.get('session_id')
+        index = int(request.GET.get('index', 0))
+
+        if not session_id:
+            return Response({'error': 'session_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            session = QuizSession.objects.get(id=session_id)
+        except QuizSession.DoesNotExist:
+            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        quiz = session.quiz
+        questions_list = list(quiz.questions.all())
+
+        if index >= len(questions_list):
+            return Response({'finished': True})
+
+        current_question = questions_list[index]
+
+        return Response({
+            'id': current_question.id,
+            'text': current_question.text,
+            'timer': 30,
+            'index': index,
+            'answers': [
+                {'id': ans.id, 'text': ans.text}
+                for ans in current_question.answer_options.all()
+            ]
+        })
+
+    def retrieve(self, request, *args, **kwargs):
+        session = self.get_object()
+
+        if not request.user.is_authenticated:
+            return Response({
+                'id': session.id,
+                'code': session.code,
+                'status': session.status,
+                'quiz_title': session.quiz.title
+            })
+
+        quiz = session.quiz
+        question_index = int(request.GET.get('index', 0))
+        questions_list = list(quiz.questions.all())
+
+        if question_index >= len(questions_list):
+            session.status = 'completed'
+            session.ended_at = timezone.now()
+            session.save()
+            return Response({'finished': True})
+
+        current_question = questions_list[question_index]
+
+        return Response({
+            'id': current_question.id,
+            'text': current_question.text,
+            'timer': 30,
+            'index': question_index,
+            'answers': [
+                {'id': ans.id, 'text': ans.text}
+                for ans in current_question.answer_options.all()
+            ]
+        })
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
@@ -70,9 +163,9 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         quiz_log.info(f"Session {session.id} ended successfully")
         return Response({'status': 'completed'})
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny()])
     def answer(self, request, pk=None):
-        session = self.get_object()
+        session = QuizSession.objects.get(id=pk)
         question_id = request.data.get('question_id')
         answer_id = request.data.get('answer_id')
 
@@ -95,9 +188,9 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         except Question.DoesNotExist:
             return Response({'error': 'Question not found'}, status=404)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def my_result(self, request, pk=None):
-        session = self.get_object()
+        session = QuizSession.objects.get(id=pk)
         answers = ParticipantAnswer.objects.filter(session=session)
         total_questions = session.quiz.questions.count()
         correct_answers = answers.filter(is_correct=True).count()
@@ -125,21 +218,16 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             'rank': rank
         })
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def results(self, request, pk=None):
-        session = self.get_object()
+        session = QuizSession.objects.get(id=pk)
         all_sessions = QuizSession.objects.filter(quiz=session.quiz)
-
-        print("=== RESULTS DEBUG ===")
-        for s in all_sessions:
-            print(f"Session {s.id}: name='{s.participant_name}', code='{s.code}'")
 
         from collections import defaultdict
         scores = defaultdict(int)
         for s in all_sessions:
             correct = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
             scores[s.id] = correct
-            print(f"Session {s.id}: score={correct}")
 
         sorted_sessions = sorted(all_sessions, key=lambda x: scores[x.id], reverse=True)
 
@@ -154,52 +242,4 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'rank': i + 1
             })
 
-        print(f"Results data: {results}")
         return Response(results)
-
-    @action(detail=True, methods=['get'])
-    def questions_stats(self, request, pk=None):
-        session = self.get_object()
-        questions = session.quiz.questions.all()
-
-        stats = []
-        for q in questions:
-            answers = ParticipantAnswer.objects.filter(session=session, question=q)
-            total = answers.count()
-            correct = answers.filter(is_correct=True).count()
-
-            stats.append({
-                'question_id': q.id,
-                'question_text': q.text,
-                'total_answers': total,
-                'correct_count': correct,
-                'correct_percent': round(correct / total * 100, 1) if total > 0 else 0
-            })
-
-        return Response(stats)
-
-    def retrieve(self, request, *args, **kwargs):
-        session = self.get_object()
-        quiz = session.quiz
-
-        question_index = int(request.GET.get('index', 0))
-        questions_list = list(quiz.questions.all())
-
-        if question_index >= len(questions_list):
-            session.status = 'completed'
-            session.ended_at = timezone.now()
-            session.save()
-            return Response({'finished': True})
-
-        current_question = questions_list[question_index]
-
-        return Response({
-            'id': current_question.id,
-            'text': current_question.text,
-            'timer': 30,
-            'index': question_index,
-            'answers': [
-                {'id': ans.id, 'text': ans.text}
-                for ans in current_question.answer_options.all()
-            ]
-        })
