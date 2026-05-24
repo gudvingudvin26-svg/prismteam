@@ -1,42 +1,29 @@
-import dj_database_url
-from pathlib import Path
+"""
+Django settings for config project.
+"""
 import os
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-LOG_DIR = os.path.join(BASE_DIR, 'app_modules', 'quiz', 'Logging')
-os.makedirs(LOG_DIR, exist_ok=True)
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-ny+!$q8y65e54a^ekhck7a8^1)!uzqk7z&+t_zbmp8r!lk-g$e')
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-from app_modules.quiz.log_filters import InfoOrErrorFilter
-
-SECRET_KEY = 'django-insecure-ny+!$q8y65e54a^ekhck7a8^1)!uzqk7z&+t_zbmp8r!lk-g$e'
-
-DEBUG = False
-
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    'prismteam-backend.onrender.com',
-    '*.onrender.com',
-]
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',') if os.environ.get('ALLOWED_HOSTS') else []
 
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
-    'corsheaders',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'rest_framework_simplejwt',
     'channels',
     'app_modules.quiz',
-    'app_modules.quiz_sessions',
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -66,116 +53,47 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+# Database
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+if DATABASE_URL:
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
     }
-}
-
-REDIS_HOST = 'localhost'
-REDIS_PORT = 6379
-REDIS_DB = 0
-
-DATABASES = {
-    'default': dj_database_url.config(default='sqlite:///db.sqlite3')
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "simple": {
-            "format": '{asctime} - {levelname} - {message}',
-            "style": "{",
-        }
-    },
-    "filters": {
-        "info_or_error": {
-            "()": InfoOrErrorFilter,
-        }
-    },
-    "handlers": {
-        "login_log": {
-            "level": "INFO",
-            "filters": ["info_or_error"],
-            "class": "logging.FileHandler",
-            "formatter": "simple",
-            "filename": "app_modules/quiz/Logging/login.log",
-        },
-        "quiz_log": {
-            "level": "INFO",
-            "filters": ["info_or_error"],
-            "class": "logging.FileHandler",
-            "formatter": "simple",
-            "filename": "app_modules/quiz/Logging/quiz.log",
-        }
-    },
-    'loggers': {
-        "login_log": {
-            "handlers": ["login_log"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "quiz_log": {
-            "handlers": ["quiz_log"],
-            "level": "INFO",
-            "propagate": False,
-        }
-    }
-}
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-AUTH_USER_MODEL = 'quiz.User'
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
+AUTH_USER_MODEL = 'auth.User'   # в main используется стандартная модель
 
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
+# Redis
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+REDIS_PORT = int(os.environ.get('REDIS_PORT', 6379))
 
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
-
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [(REDIS_HOST, REDIS_PORT)],
+        },
+    },
 }
