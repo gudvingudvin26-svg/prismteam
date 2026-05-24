@@ -12,7 +12,6 @@ from django.core.exceptions import ValidationError
 class User(AbstractUser):
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=13, blank=True, null=True, unique=True)
-    jwt_token = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
         return self.username

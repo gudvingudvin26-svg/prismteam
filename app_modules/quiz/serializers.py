@@ -8,7 +8,11 @@ from .validators import validate_answer_options_data
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone', 'password', 'jwt_token']
+        fields = ['id', 'username', 'email', 'phone', 'password']
+
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
 
 
 # === Quiz-constructor ===

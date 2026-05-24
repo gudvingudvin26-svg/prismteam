@@ -13,7 +13,7 @@ import dj_database_url
 from pathlib import Path
 import os
 
-from app_modules.quiz.log_filters import OnlyInfoFilter
+from app_modules.quiz.log_filters import InfoOrErrorFilter
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -131,22 +131,37 @@ LOGGING = {
         }
     },
     "filters": {
-        "only_info": {
-            "()": OnlyInfoFilter,
+        "info_or_error": {
+            "()": InfoOrErrorFilter,
         }
     },
     "handlers": {
-        "file": {
+        "login_log": {
             "level": "INFO",
-            "filters": ["only_info"],
+            "filters": ["info_or_error"],
             "class": "logging.FileHandler",
             "formatter": "simple",
-            "filename": "app_modules/quiz/quiz.log",
+            "filename": "app_modules/quiz/Logging/login.log",
         },
+        "quiz_log": {
+            "level": "INFO",
+            "filters": ["info_or_error"],
+            "class": "logging.FileHandler",
+            "formatter": "simple",
+            "filename": "app_modules/quiz/Logging/quiz.log",
+        }
     },
-    'root': {
-        'handlers': ['file'],
-        'level': 'INFO',
+    'loggers': {
+        "login_log": {
+            "handlers": ["login_log"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "quiz_log": {
+            "handlers": ["quiz_log"],
+            "level": "INFO",
+            "propagate": False,
+        }
     }
 }
 

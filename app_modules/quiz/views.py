@@ -17,43 +17,76 @@ from .models import User, Quiz, Question, AnswerOption
 from .serializers import UserSerializer, QuizSerializer, QuestionSerializer, AnswerOptionSerializer
 from .validators import validate_quiz_integrity
 
-logger = logging.getLogger('reg-log_logger')
-
+login_log = logging.getLogger('login_log')
+user = None
 
 class UserRegistration(APIView):
     def post(self, request):
+        global user
         serializer = UserSerializer(data=request.data)
-        if serializer.is_valid():
-            if request.data['password'] != '':
-                if request.data['phone'].isdigit():
-                    if request.data['password'] == request.POST['again_password']:
-                        if len(request.data['phone']) >= 10:
-                            if not request.data['username'].isdigit():
-                                if request.data['username'].count('@') == 0:
-                                    user = serializer.save()
-                                    user.jwt_token = jwt.encode(
-                                        {'sub': user.id, 'exp': datetime.now() + timedelta(hours=1),
-                                         'name': user.username, 'email': user.email},
-                                        key=settings.SECRET_KEY
-                                    )
-                                    user.save()
-                                    login(request, user)
-                                    logger.info(f'User registered with username {user.username} successfully')
-                                    return render(request, 'main.html')
-                                else:
-                                    return Response('Username cannot include "@" to avoid errors', status=status.HTTP_400_BAD_REQUEST)
-                            else:
-                                return Response('Username cannot include only numbers to avoid errors', status=status.HTTP_400_BAD_REQUEST)
-                        else:
-                            return Response('Phone number is too short', status=status.HTTP_400_BAD_REQUEST)
-                    else:
-                        return Response('Fields "Password" and "Repeat password" are not matching', status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    return Response('Phone number can contain only a numbers', status=status.HTTP_400_BAD_REQUEST)
-            else:
-                return Response('You forgot to create a password', status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        print("DATA:", request.data)
+
+        if not serializer.is_valid():
+            print("SERIALIZER ERRORS:", serializer.errors)
+
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        password = request.data.get('password')
+        again_password = request.data.get('again_password')
+        phone = request.data.get('phone')
+        username = request.data.get('username')
+
+        if not password:
+            return Response(
+                {'error': 'Password required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if password != again_password:
+            return Response(
+                {'error': 'Passwords do not match'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not phone or not phone.isdigit():
+            return Response(
+                {'error': 'Phone must contain only numbers'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(phone) < 10:
+            return Response(
+                {'error': 'Phone number too short'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if username.isdigit():
+            return Response(
+                {'error': 'Username cannot contain only numbers'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if '@' in username:
+            return Response(
+                {'error': 'Username cannot contain @'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = serializer.save()
+
+        user.set_password(password)
+        user.save()
+
+        refresh = RefreshToken.for_user(user)
+
+        login(request, user)
+        login_log.info(f'User registered successfully with username {user.username}')
+
+        return render(request, 'main.html')
 
     def get(self, request):
         if request.user.is_authenticated:
@@ -63,6 +96,7 @@ class UserRegistration(APIView):
 
 class UserLogin(APIView):
     def post(self, request):
+        global user
         if request.data['identification_parameter'].isdigit():
             user = User.objects.filter(phone=request.data['identification_parameter']).first()
         elif request.data['identification_parameter'].count('@') > 0:
@@ -73,16 +107,15 @@ class UserLogin(APIView):
         if not user:
             return Response('User with this username/email/phone does not exist', status=status.HTTP_400_BAD_REQUEST)
         else:
-            if user.password == request.data['password']:
-                user.jwt_token = jwt.encode(
-                    {'sub': user.id, 'exp': datetime.now() + timedelta(hours=1),
-                     'name': user.username, 'email': user.email},
-                    key=settings.SECRET_KEY
-                )
-                user.save()
+            if user.check_password(request.data.get('password')):
+                refresh = RefreshToken.for_user(user)
                 login(request, user)
-                logging.info(f'User logged in with username {user.username} successfully')
-                return render(request, 'main.html')
+                if request.user.is_authenticated:
+                    login_log.info(f'User logged in with username {user.username} successfully')
+                    return render(request, 'main.html')
+                else:
+                    login_log.error(f'User can not log in for some reason')
+                    return Response('User can not log in for some reason', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 return Response('Wrong password', status=status.HTTP_400_BAD_REQUEST)
 
@@ -100,20 +133,18 @@ class Main(APIView):
 
 class UserLogout(APIView):
     def post(self, request):
-        if request.user.is_authenticated:
-            request.user.jwt_token = ''
-            request.user.save()
+        global user
+        username = user.username
+        print(1)
+        logout(request)
+        print(2)
+        if not request.user.is_authenticated:
+            print(3)
+            login_log.info(f'User with username {username} logged out successfully')
+            return redirect('http://127.0.0.1:8000/login/')
         else:
+            login_log.error(f'User with username {username} can not log out for some reason')
             return redirect('http://127.0.0.1:8000/main/')
-        if request.user.jwt_token == '':
-            name = request.user.username
-            logout(request)
-            if request.user.is_authenticated:
-                logger.info(f'User can not log out with username {name} successfully')
-                return redirect('http://127.0.0.1:8000/main/')
-            else:
-                logger.info(f'User logged out with username {name} successfully')
-        return redirect('http://127.0.0.1:8000/login/')
 
     def get(self, request):
         return redirect('http://127.0.0.1:8000/main/')
