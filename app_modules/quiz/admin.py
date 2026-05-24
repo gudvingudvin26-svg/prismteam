@@ -44,7 +44,7 @@ class QuestionInline(admin.StackedInline):
 
 
 class QuizAdmin(admin.ModelAdmin):
-    list_display = ('title', 'created_by', 'access_token')
+    list_display = ('title', 'created_by', 'access_token', 'timer')
     list_filter = ('created_by',)
     search_fields = ('title', 'description', 'access_token')
     readonly_fields = ('access_token',)

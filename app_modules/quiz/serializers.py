@@ -22,12 +22,14 @@ class AnswerOptionSerializer(serializers.Serializer):
     is_correct = serializers.BooleanField(default=False)
 
 
-class QuestionSerializer(serializers.ModelSerializer):
-    answer_options = AnswerOptionSerializer(many=True, required=True)
+class QuizSerializer(serializers.ModelSerializer):
+    questions = QuestionSerializer(many=True, read_only=True)
+    created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
-        model = Question
-        fields = ['id', 'quiz', 'text', 'order', 'answer_options']
+        model = Quiz
+        fields = ['id', 'title', 'description', 'created_by', 'access_token', 'timer', 'questions']
+        read_only_fields = ['access_token']
 
     def validate_answer_options(self, value):
         validate_answer_options_data(value)

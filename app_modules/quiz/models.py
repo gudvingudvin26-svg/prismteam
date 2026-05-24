@@ -59,6 +59,7 @@ class Quiz(models.Model):
         default=generate_token,
         verbose_name="Токен доступа"
     )
+    timer = models.IntegerField(blank=True, null=True, verbose_name="Таймер в секундах")
 
     def __str__(self):
         return self.title
