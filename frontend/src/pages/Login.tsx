@@ -33,8 +33,8 @@ const Login: React.FC = () => {
 
       if (status === 401) {
         setError('Неверный email или пароль');
-      } else if (status === 404) {
-        setError('Пользователь с таким email не найден');
+      } else if (status === 400) {
+        setError('Заполните все поля');
       } else {
         setError(data?.detail || data?.message || data?.error || 'Ошибка входа. Проверьте email и пароль.');
       }

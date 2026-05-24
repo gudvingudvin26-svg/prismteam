@@ -94,36 +94,44 @@ class UserRegistration(APIView):
         return render(request, 'registration.html')
 
 
-class UserLogin(APIView):
+class UserLoginAPI(APIView):
     def post(self, request):
-        global user
-        if request.data['identification_parameter'].isdigit():
-            user = User.objects.filter(phone=request.data['identification_parameter']).first()
-        elif request.data['identification_parameter'].count('@') > 0:
-            user = User.objects.filter(email=request.data['identification_parameter']).first()
-        else:
-            user = User.objects.filter(username=request.data['identification_parameter']).first()
+        email = request.data.get('email')
+        password = request.data.get('password')
 
-        if not user:
-            return Response('User with this username/email/phone does not exist', status=status.HTTP_400_BAD_REQUEST)
-        else:
-            if user.check_password(request.data.get('password')):
-                refresh = RefreshToken.for_user(user)
-                login(request, user)
-                if request.user.is_authenticated:
-                    login_log.info(f'User logged in with username {user.username} successfully')
-                    return render(request, 'main.html')
-                else:
-                    login_log.error(f'User can not log in for some reason')
-                    return Response('User can not log in for some reason', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            else:
-                return Response('Wrong password', status=status.HTTP_400_BAD_REQUEST)
+        if not email or not password:
+            return Response(
+                {'error': 'Email and password required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-    def get(self, request):
-        if request.user.is_authenticated:
-            return render(request, 'main.html')
-        else:
-            return render(request, 'login.html')
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {'detail': 'Неверный email или пароль'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        if not user.check_password(password):
+            return Response(
+                {'detail': 'Неверный email или пароль'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name
+            }
+        }, status=status.HTTP_200_OK)
 
 
 class Main(APIView):
