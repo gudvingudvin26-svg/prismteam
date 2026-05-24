@@ -94,30 +94,129 @@ class UserRegistration(APIView):
         return render(request, 'registration.html')
 
 
+class UserLogin(APIView):
+    def post(self, request):
+        global user
+        identification_parameter = request.data.get('identification_parameter')
+        password = request.data.get('password')
+
+        if not identification_parameter or not password:
+            return Response({'error': 'Identification parameter and password required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if identification_parameter.isdigit():
+            user = User.objects.filter(phone=identification_parameter).first()
+        elif '@' in identification_parameter:
+            user = User.objects.filter(email=identification_parameter).first()
+        else:
+            user = User.objects.filter(username=identification_parameter).first()
+
+        if not user:
+            login_log.error(f'Login failed: User with {identification_parameter} does not exist')
+            return Response({'error': 'User with this username/email/phone does not exist'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            if user.check_password(password):
+                refresh = RefreshToken.for_user(user)
+                login(request, user)
+                if request.user.is_authenticated:
+                    login_log.info(f'User logged in with username {user.username} successfully')
+                    return render(request, 'main.html')
+                else:
+                    login_log.error(f'User can not log in for some reason')
+                    return Response('User can not log in for some reason', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                login_log.error(f'Login failed: Wrong password for {identification_parameter}')
+                return Response({'error': 'Wrong password'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    def get(self, request):
+        if request.user.is_authenticated:
+            return render(request, 'main.html')
+        else:
+            return render(request, 'login.html')
+
+
+class Main(APIView):
+    def get(self, request):
+        return render(request, 'main.html')
+
+
+class UserLogout(APIView):
+    def post(self, request):
+        global user
+        username = user.username
+        logout(request)
+        if not request.user.is_authenticated:
+            login_log.info(f'User with username {username} logged out successfully')
+            return redirect('http://127.0.0.1:8000/login/')
+        else:
+            login_log.error(f'User with username {username} can not log out for some reason')
+            return redirect('http://127.0.0.1:8000/main/')
+
+    def get(self, request):
+        return redirect('http://127.0.0.1:8000/main/')
+
+
+class UserRegistrationAPI(APIView):
+    def post(self, request):
+        print("=== REGISTRATION REQUEST ===")
+        print("Request data:", request.data)
+
+        serializer = UserSerializer(data=request.data)
+        if not serializer.is_valid():
+            print("Serializer errors:", serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        username = request.data.get('username')
+        email = request.data.get('email')
+        password = request.data.get('password')
+        again_password = request.data.get('again_password')
+        first_name = request.data.get('first_name', '')
+
+        if not username:
+            return Response({'error': 'Username required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not email:
+            return Response({'error': 'Email required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not password:
+            return Response({'error': 'Password required'}, status=status.HTTP_400_BAD_REQUEST)
+        if password != again_password:
+            return Response({'error': 'Passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(password) < 6:
+            return Response({'error': 'Password must be at least 6 characters'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        user.first_name = first_name
+        user.set_password(password)
+        user.save()
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name
+            }
+        }, status=status.HTTP_201_CREATED)
+
+
 class UserLoginAPI(APIView):
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
 
         if not email or not password:
-            return Response(
-                {'error': 'Email and password required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'Email and password required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            return Response(
-                {'detail': 'Неверный email или пароль'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return Response({'detail': 'Неверный email или пароль'}, status=status.HTTP_401_UNAUTHORIZED)
 
         if not user.check_password(password):
-            return Response(
-                {'detail': 'Неверный email или пароль'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return Response({'detail': 'Неверный email или пароль'}, status=status.HTTP_401_UNAUTHORIZED)
 
         refresh = RefreshToken.for_user(user)
 
@@ -132,30 +231,6 @@ class UserLoginAPI(APIView):
                 'last_name': user.last_name
             }
         }, status=status.HTTP_200_OK)
-
-
-class Main(APIView):
-    def get(self, request):
-        return render(request, 'main.html')
-
-
-class UserLogout(APIView):
-    def post(self, request):
-        global user
-        username = user.username
-        print(1)
-        logout(request)
-        print(2)
-        if not request.user.is_authenticated:
-            print(3)
-            login_log.info(f'User with username {username} logged out successfully')
-            return redirect('http://127.0.0.1:8000/login/')
-        else:
-            login_log.error(f'User with username {username} can not log out for some reason')
-            return redirect('http://127.0.0.1:8000/main/')
-
-    def get(self, request):
-        return redirect('http://127.0.0.1:8000/main/')
 
 
 class QuizViewSet(viewsets.ModelViewSet):
@@ -223,81 +298,3 @@ class AnswerOptionViewSet(viewsets.ModelViewSet):
         return AnswerOption.objects.filter(
             question__quiz__created_by=user
         ).select_related('question__quiz')
-
-
-class UserRegistrationAPI(APIView):
-    def post(self, request):
-        print("=== REGISTRATION REQUEST ===")
-        print("Request data:", request.data)
-
-        serializer = UserSerializer(data=request.data)
-        if not serializer.is_valid():
-            print("Serializer errors:", serializer.errors)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        username = request.data.get('username')
-        email = request.data.get('email')
-        password = request.data.get('password')
-        again_password = request.data.get('again_password')
-        first_name = request.data.get('first_name', '')
-
-        if not username:
-            return Response({'error': 'Username required'}, status=status.HTTP_400_BAD_REQUEST)
-        if not email:
-            return Response({'error': 'Email required'}, status=status.HTTP_400_BAD_REQUEST)
-        if not password:
-            return Response({'error': 'Password required'}, status=status.HTTP_400_BAD_REQUEST)
-        if password != again_password:
-            return Response({'error': 'Passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
-        if len(password) < 6:
-            return Response({'error': 'Password must be at least 6 characters'}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = serializer.save()
-        user.first_name = first_name
-        user.set_password(password)
-        user.save()
-
-        refresh = RefreshToken.for_user(user)
-
-        return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name
-            }
-        }, status=status.HTTP_201_CREATED)
-
-
-class UserLoginAPI(APIView):
-    def post(self, request):
-        email = request.data.get('email')
-        password = request.data.get('password')
-
-        if not email or not password:
-            return Response({'error': 'Email and password required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        if not user.check_password(password):
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        refresh = RefreshToken.for_user(user)
-
-        return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name
-            }
-        }, status=status.HTTP_200_OK)
