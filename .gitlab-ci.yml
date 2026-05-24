@@ -12,21 +12,20 @@ cache:
     - .cache/pip
     - frontend/node_modules
 
-# ========== БЭКЕНД ТЕСТЫ ==========
 backend-test:
   stage: test
   image: python:3.11
   before_script:
-    - pip install -r requirements.txt
+    - pip install -r requirements-dev.txt
   script:
     - python manage.py migrate
-    - python manage.py test app_modules.quiz
+    - pytest app_modules/quiz/tests_ws.py -v
+    - python manage.py test app_modules.quiz --exclude-tag=ws
   only:
     - main
     - develop-backend
     - merge_requests
 
-# ========== ФРОНТЕНД ТЕСТЫ ==========
 frontend-test:
   stage: test
   image: node:18
@@ -40,12 +39,11 @@ frontend-test:
     - develop-backend
     - merge_requests
 
-# ========== ЛИНТЕРЫ ==========
 pylint:
   stage: test
   image: python:3.11
   before_script:
-    - pip install pylint pylint-django
+    - pip install -r requirements-dev.txt
   script:
     - pylint app_modules/quiz --fail-under=8.0
   allow_failure: true
@@ -64,7 +62,6 @@ eslint:
   only:
     - merge_requests
 
-# ========== СБОРКА ==========
 build-backend:
   stage: build
   image: python:3.11
@@ -89,7 +86,6 @@ build-frontend:
     - main
     - develop-backend
 
-# ========== ДЕПЛОЙ (опционально) ==========
 deploy:
   stage: deploy
   image: alpine:latest

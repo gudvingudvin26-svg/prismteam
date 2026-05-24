@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import Input from '../ui/Input';
+import Button from '../ui/Button';
 
 interface QuestionFormProps {
   question: {
@@ -38,18 +40,15 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ question, index, onChange, 
     <div className="border p-4 mb-4 rounded">
       <div className="flex justify-between items-center mb-2">
         <h3 className="font-medium">Вопрос {index + 1}</h3>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="px-2 py-1 bg-red-500 text-white rounded text-sm"
-        >
-          Удалить
-        </button>
+        <Button variant="danger" size="sm" onClick={onDelete}>Удалить</Button>
       </div>
 
       <div className="mb-4">
-        <label className="block mb-1 text-sm font-medium">Текст вопроса</label>
+        <label htmlFor={`question-text-${question.id}`} className="block mb-1 text-sm font-medium">
+          Текст вопроса
+        </label>
         <input
+          id={`question-text-${question.id}`}
           value={question.text}
           onChange={(e) => onChange({ ...question, text: e.target.value })}
           onBlur={handleBlur}
@@ -85,17 +84,18 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ question, index, onChange, 
               placeholder={`Вариант ${optIndex + 1}`}
               className="flex-1 px-3 py-2 border rounded"
             />
+            <Button variant="danger" size="sm" onClick={() => {
+              const newOptions = [...question.options];
+              newOptions.splice(optIndex, 1);
+              onChange({ ...question, options: newOptions });
+            }}>×</Button>
           </div>
         ))}
         {errors.options && <p className="text-red-500 text-sm">{errors.options}</p>}
 
-        <button
-          type="button"
-          onClick={addOption}
-          className="px-3 py-1 bg-gray-500 text-white rounded text-sm"
-        >
+        <Button variant="outline" size="sm" onClick={addOption}>
           + Добавить вариант
-        </button>
+        </Button>
       </div>
     </div>
   );

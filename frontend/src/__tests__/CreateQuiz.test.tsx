@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import CreateQuiz from '../components/quiz/CreateQuiz';
 
-jest.mock('../../api/quizzes', () => ({
+jest.mock('../api/quizzes', () => ({
   quizzesApi: {
     createQuiz: jest.fn().mockResolvedValue({ data: { id: 1 } }),
     createQuestion: jest.fn().mockResolvedValue({})
