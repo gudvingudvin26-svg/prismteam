@@ -27,7 +27,7 @@
 - **JWT** — аутентификация
 - **PostgreSQL** — база данных
 - **Redis** — кэширование и временные данные
-- **Celery** — фоновые задачи
+- **Channels** — WebSocket для реального времени
 
 ### Фронтенд
 - **React 18** — UI библиотека
@@ -40,9 +40,8 @@
 
 ## Требования
 
-- Python 3.10+
+- Python 3.11+
 - Node.js 18+
-- Docker и Docker Compose (опционально)
 - PostgreSQL 14+
 - Redis 7+
 
@@ -52,8 +51,8 @@
 
 ```bash
 # Клонировать репозиторий
-git clone https://github.com/your-org/quiz-service.git
-cd quiz-service
+git clone https://github.com/gudvingudvin26-svg/prismteam.git
+cd prismteam
 
 # Скопировать пример переменных окружения
 cp .env.example .env

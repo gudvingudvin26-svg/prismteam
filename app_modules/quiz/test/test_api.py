@@ -2,10 +2,26 @@ from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from rest_framework import serializers as drf_serializers
-from django.contrib.auth.models import User
 
-from app_modules.quiz.models import Quiz, Question, AnswerOption
-from app_modules.quiz.serializers import AnswerOptionSerializer  # Ваш текущий сериализатор
+from app_modules.quiz.models import User, Quiz, Question, AnswerOption
+from app_modules.quiz.serializers import AnswerOptionSerializer
+
+
+class _AnswerOptionModelSerializer(AnswerOptionSerializer):
+    question = drf_serializers.PrimaryKeyRelatedField(queryset=Question.objects.all())
+
+    class Meta:
+        model = AnswerOption
+        fields = ['id', 'question', 'text', 'is_correct']
+
+    def create(self, validated_data):
+        return AnswerOption.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
 
 class QuizAPITest(APITestCase):
@@ -105,21 +121,6 @@ class QuestionAPITest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
         self.question.refresh_from_db()
         self.assertEqual(self.question.text, "Updated Question Text Here")
-class _AnswerOptionModelSerializer(AnswerOptionSerializer):
-    question = drf_serializers.PrimaryKeyRelatedField(queryset=Question.objects.all())
-
-    class Meta:
-        model = AnswerOption
-        fields = ['id', 'question', 'text', 'is_correct']
-
-    def create(self, validated_data):
-        return AnswerOption.objects.create(**validated_data)
-
-    def update(self, instance, validated_data):
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        return instance
 
 
 class AnswerOptionAPITest(APITestCase):
@@ -133,7 +134,6 @@ class AnswerOptionAPITest(APITestCase):
     def setUp(self):
         self.client = APIClient()
         self.client.force_authenticate(user=self.org)
-        # Подменяем сериализатор в ViewSet только для тестов
         from app_modules.quiz import views
         self.original_serializer = views.AnswerOptionViewSet.serializer_class
         views.AnswerOptionViewSet.serializer_class = _AnswerOptionModelSerializer

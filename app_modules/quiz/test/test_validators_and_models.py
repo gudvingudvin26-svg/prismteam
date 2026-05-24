@@ -1,10 +1,9 @@
 import secrets
 from django.test import TestCase
-from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
-from app_modules.quiz.models import Quiz, Question, AnswerOption, generate_token
+from app_modules.quiz.models import User, Quiz, Question, AnswerOption, generate_token
 from app_modules.quiz.validators import validate_answer_options_data, validate_quiz_integrity
 
 

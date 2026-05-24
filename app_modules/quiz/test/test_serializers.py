@@ -1,8 +1,7 @@
 from django.test import TestCase
-from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
-from app_modules.quiz.models import Quiz, Question, AnswerOption
+from app_modules.quiz.models import User, Quiz, Question, AnswerOption
 from app_modules.quiz.serializers import QuizSerializer, QuestionSerializer, AnswerOptionSerializer
 
 
@@ -84,7 +83,10 @@ class TestSerializers(TestCase):
         )
 
     def test_quiz_create_sets_created_by(self):
-        context = {"request": type("Request", (), {"user": self.user})}
+        class MockRequest:
+            user = self.user
+
+        context = {"request": MockRequest()}
         data = {"title": "New Quiz", "description": "Desc"}
         s = QuizSerializer(data=data, context=context)
         self.assertTrue(s.is_valid(), s.errors)
@@ -99,7 +101,10 @@ class TestSerializers(TestCase):
         self.assertEqual(len(s.data["questions"]), 1)
 
     def test_quiz_serializer_created_by_hidden(self):
-        context = {"request": type("Request", (), {"user": self.user})}
+        class MockRequest:
+            user = self.user
+
+        context = {"request": MockRequest()}
         data = {"title": "Test", "created_by": 999}
         s = QuizSerializer(data=data, context=context)
         self.assertTrue(s.is_valid())

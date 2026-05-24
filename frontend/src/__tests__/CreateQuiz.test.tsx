@@ -30,7 +30,7 @@ describe('CreateQuiz', () => {
     const submitButton = screen.getByText('Сохранить квиз');
     fireEvent.click(submitButton);
 
-    expect(screen.getByText('Добавьте хотя бы один вопрос')).toBeInTheDocument();
+    expect(screen.getByText('Добавьте хотя бы два вопроса')).toBeInTheDocument();
   });
 
   test('adds new question when clicking add question button', () => {
@@ -48,20 +48,24 @@ describe('CreateQuiz', () => {
 
     const addButton = screen.getByText('+ Добавить вопрос');
     fireEvent.click(addButton);
+    fireEvent.click(addButton);
 
-    const questionInput = screen.getByLabelText('Текст вопроса');
-    fireEvent.change(questionInput, { target: { value: 'Test question?' } });
+    const questionInputs = screen.getAllByLabelText('Текст вопроса');
+    fireEvent.change(questionInputs[0], { target: { value: 'First question?' } });
+    fireEvent.change(questionInputs[1], { target: { value: 'Second question?' } });
 
-    const optionInput = screen.getByPlaceholderText('Вариант 1');
-    fireEvent.change(optionInput, { target: { value: 'Answer 1' } });
+    const optionInputs = screen.getAllByPlaceholderText(/Вариант 1/);
+    fireEvent.change(optionInputs[0], { target: { value: 'Answer 1' } });
+    fireEvent.change(optionInputs[2], { target: { value: 'Answer 1 for Q2' } });
 
-    const radio = screen.getByRole('radio');
-    fireEvent.click(radio);
+    const radios = screen.getAllByRole('radio');
+    fireEvent.click(radios[0]);
+    fireEvent.click(radios[2]);
 
     const submitButton = screen.getByText('Сохранить квиз');
     fireEvent.click(submitButton);
 
     expect(screen.queryByText('Введите название квиза')).not.toBeInTheDocument();
-    expect(screen.queryByText('Добавьте хотя бы один вопрос')).not.toBeInTheDocument();
+    expect(screen.queryByText('Добавьте хотя бы два вопроса')).not.toBeInTheDocument();
   });
 });
