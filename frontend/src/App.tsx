@@ -19,7 +19,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
-    <div className="text-white text-xl">Загрузка...</div>
+    <div className="text-white text-xl animate-pulse-fast">Загрузка...</div>
   </div>
 );
 
@@ -53,59 +53,61 @@ function App() {
   return (
     <BrowserRouter>
       <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/join" element={<JoinQuiz />} />
-          <Route path="/play/:sessionId" element={<QuizSession />} />
-          <Route path="/results/:sessionId" element={<Results />} />
-          <Route path="/access-denied" element={<AccessDenied />} />
-          <Route path="/not-found" element={<NotFound />} />
+        <div className="animate-fadeIn">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/join" element={<JoinQuiz />} />
+            <Route path="/play/:sessionId" element={<QuizSession />} />
+            <Route path="/results/:sessionId" element={<Results />} />
+            <Route path="/access-denied" element={<AccessDenied />} />
+            <Route path="/not-found" element={<NotFound />} />
 
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/quizzes"
-            element={
-              <PrivateRoute>
-                <QuizList />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/quizzes/create"
-            element={
-              <PrivateRoute>
-                <CreateQuiz />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/quizzes/:id/edit"
-            element={
-              <PrivateRoute>
-                <CreateQuiz />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/stats/:sessionId"
-            element={
-              <PrivateRoute>
-                <Stats />
-              </PrivateRoute>
-            }
-          />
+            <Route
+              path="/dashboard"
+              element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/quizzes"
+              element={
+                <PrivateRoute>
+                  <QuizList />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/quizzes/create"
+              element={
+                <PrivateRoute>
+                  <CreateQuiz />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/quizzes/:id/edit"
+              element={
+                <PrivateRoute>
+                  <CreateQuiz />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/stats/:sessionId"
+              element={
+                <PrivateRoute>
+                  <Stats />
+                </PrivateRoute>
+              }
+            />
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </div>
       </Suspense>
     </BrowserRouter>
   );

@@ -17,14 +17,18 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   }, []);
 
   if (isChecking) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
+        <div className="text-white text-xl animate-pulse-fast">Проверка авторизации...</div>
+      </div>
+    );
   }
 
   if (!token || !user) {
     return <Navigate to="/login" replace />;
   }
 
-  return <div className="page-transition">{children}</div>;
+  return <div className="animate-fadeIn">{children}</div>;
 };
 
 export default PrivateRoute;
