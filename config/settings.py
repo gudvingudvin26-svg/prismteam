@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'channels',
     'app_modules.quiz',
+    'app_modules.quiz_sessions'
 ]
 
 MIDDLEWARE = [

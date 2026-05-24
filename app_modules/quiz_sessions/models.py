@@ -17,6 +17,9 @@ class QuizSession(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
 
+    class Meta:
+        app_label = 'app_modules.quiz_sessions'
+
     def __str__(self):
         return f"{self.quiz.title} - {self.code} - {self.participant_name}"
 
@@ -27,6 +30,9 @@ class ParticipantAnswer(models.Model):
     answer = models.ForeignKey(AnswerOption, on_delete=models.CASCADE, null=True, blank=True)
     is_correct = models.BooleanField(default=False)
     answered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = 'app_modules.quiz_sessions'
 
     def __str__(self):
         return f"{self.session.code} - Q{self.question.id}: {self.is_correct}"
