@@ -298,3 +298,15 @@ class AnswerOptionViewSet(viewsets.ModelViewSet):
         return AnswerOption.objects.filter(
             question__quiz__created_by=user
         ).select_related('question__quiz')
+class GetCurrentUserAPI(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name
+        }, status=status.HTTP_200_OK)

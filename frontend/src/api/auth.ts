@@ -19,6 +19,9 @@ export const authApi = {
   getProfile: () =>
     api.get('/api/auth/profile/'),
 
+  getCurrentUser: () =>
+    api.get('/api/auth/me/'),
+
   saveTokens: (access: string, refresh: string) => {
     localStorage.setItem('accessToken', access)
     localStorage.setItem('refreshToken', refresh)
