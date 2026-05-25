@@ -174,33 +174,62 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
-            return Response([])
+            return Response({'leaderboard': []})
 
         try:
-            all_sessions = QuizSession.objects.filter(code=session.code).exclude(participant_name__isnull=True)
+            all_sessions = QuizSession.objects.filter(code=session.code)
+
+            if session.participant_name:
+                current_name = session.participant_name
+            elif request.user.is_authenticated:
+                current_name = request.user.username
+            else:
+                current_name = "Организатор"
 
             leaderboard = []
             for s in all_sessions:
                 score = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
+
+                if s.participant_name:
+                    name = s.participant_name
+                elif s.quiz.created_by:
+                    name = s.quiz.created_by.username
+                else:
+                    name = "Организатор"
+
                 leaderboard.append({
-                    'name': s.participant_name,
+                    'name': name,
                     'score': score
                 })
 
             leaderboard.sort(key=lambda x: x['score'], reverse=True)
 
-            # Теперь возвращаем СТРОГО чистый массив (Array), как ожидает фронтенд для метода .map()
             formatted_leaderboard = []
+            current_player_rank = 1
             for index, item in enumerate(leaderboard):
                 formatted_leaderboard.append({
                     'position': index + 1,
                     'name': item['name'],
                     'score': item['score']
                 })
+                if item['name'] == current_name:
+                    current_player_rank = index + 1
 
-            return Response(formatted_leaderboard)
+            current_score = ParticipantAnswer.objects.filter(session=session, is_correct=True).count()
+            total_questions = session.quiz.questions.count()
+
+            return Response({
+                'id': session.id,
+                'participant_name': current_name,
+                'name': current_name,
+                'score': current_score,
+                'correct_answers': current_score,
+                'total_questions': total_questions,
+                'rank': current_player_rank,
+                'leaderboard': formatted_leaderboard
+            })
         except Exception:
-            return Response([])
+            return Response({'leaderboard': []})
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def questions_stats(self, request, pk=None):
