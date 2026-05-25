@@ -135,39 +135,54 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
-            return Response([])
+            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             answers = ParticipantAnswer.objects.filter(session=session)
-            result_list = []
-            for ans in answers:
-                result_list.append({
-                    'question_id': ans.question.id,
-                    'question_text': ans.question.text,
-                    'chosen_answer_id': ans.answer.id if ans.answer else None,
-                    'is_correct': ans.is_correct
-                })
-            return Response(result_list)
-        except Exception:
-            return Response([])
+            correct_answers = answers.filter(is_correct=True).count()
+            total_questions = session.quiz.questions.count()
+
+            all_sessions = QuizSession.objects.filter(code=session.code)
+            scores = {}
+            for s in all_sessions:
+                score = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
+                name = s.participant_name if s.participant_name else (s.quiz.created_by.username if s.quiz.created_by else "Организатор")
+                scores[name] = score
+
+            sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+            current_name = session.participant_name if session.participant_name else (session.quiz.created_by.username if session.quiz.created_by else "Организатор")
+
+            rank = 1
+            for i, (name, score) in enumerate(sorted_scores):
+                if name == current_name:
+                    rank = i + 1
+                    break
+
+            return Response({
+                'score': correct_answers,
+                'total_questions': total_questions,
+                'correct_answers': correct_answers,
+                'rank': rank
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def results(self, request, pk=None):
         try:
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
-            return Response([])
+            return Response([], status=status.HTTP_404_NOT_FOUND)
 
         try:
             all_sessions = QuizSession.objects.filter(code=session.code)
             players_summary = {}
+
             for s in all_sessions:
-                name = s.participant_name if s.participant_name else (
-                    s.quiz.created_by.username if s.quiz.created_by else "Организатор")
+                name = s.participant_name if s.participant_name else (s.quiz.created_by.username if s.quiz.created_by else "Организатор")
                 score = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
 
-                if name == "Организатор" and score == 0 and all_sessions.exclude(
-                        participant_name__isnull=True).exists():
+                if name == "Организатор" and score == 0 and all_sessions.exclude(participant_name__isnull=True).exists():
                     continue
 
                 if name not in players_summary or score > players_summary[name]:
@@ -175,15 +190,19 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
             leaderboard = []
             for name, score in players_summary.items():
-                leaderboard.append({'position': 0, 'name': name, 'participant_name': name, 'score': score})
+                leaderboard.append({
+                    'participant_name': name,
+                    'score': score,
+                    'id': 0
+                })
 
             leaderboard.sort(key=lambda x: x['score'], reverse=True)
             for i, item in enumerate(leaderboard):
-                item['position'] = i + 1
+                item['rank'] = i + 1
 
             return Response(leaderboard)
-        except Exception:
-            return Response([])
+        except Exception as e:
+            return Response([], status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def questions_stats(self, request, pk=None):

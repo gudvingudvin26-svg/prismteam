@@ -3,12 +3,18 @@ import { useParams, Link } from 'react-router-dom';
 import { Card, Button } from '../components/ui';
 import { sessionsApi } from '../api';
 
-interface ParticipantResult {
-  id: number;
-  participant_name: string;
+interface MyResult {
   score: number;
   total_questions: number;
+  correct_answers: number;
   rank: number;
+}
+
+interface LeaderboardEntry {
+  participant_name: string;
+  score: number;
+  rank: number;
+  id?: number;
 }
 
 interface QuestionStat {
@@ -21,8 +27,8 @@ interface QuestionStat {
 
 const Results: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [myResult, setMyResult] = useState<ParticipantResult | null>(null);
-  const [leaderboard, setLeaderboard] = useState<ParticipantResult[]>([]);
+  const [myResult, setMyResult] = useState<MyResult | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [questionsStats, setQuestionsStats] = useState<QuestionStat[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,8 +47,18 @@ const Results: React.FC = () => {
         console.log('Questions stats:', statsRes.data);
 
         setMyResult(myRes.data);
-        setLeaderboard(leaderRes.data);
-        setQuestionsStats(statsRes.data);
+
+        if (Array.isArray(leaderRes.data)) {
+          setLeaderboard(leaderRes.data);
+        } else {
+          setLeaderboard([]);
+        }
+
+        if (Array.isArray(statsRes.data)) {
+          setQuestionsStats(statsRes.data);
+        } else {
+          setQuestionsStats([]);
+        }
       } catch (error) {
         console.error(error);
       } finally {
@@ -63,7 +79,7 @@ const Results: React.FC = () => {
           <Card className="p-6 mb-8 text-center bg-blue-50">
             <h2 className="text-xl font-semibold mb-2">Ваш результат</h2>
             <p className="text-3xl font-bold text-blue-600">{myResult.score} баллов</p>
-            <p>Правильных ответов: {myResult.score}</p>
+            <p>Правильных ответов: {myResult.correct_answers}</p>
             <p>Место: {myResult.rank}</p>
           </Card>
         )}
@@ -80,20 +96,25 @@ const Results: React.FC = () => {
             </thead>
             <tbody>
               {leaderboard.map((p, idx) => (
-                <tr key={p.id} className="border-t">
-                  <td className="p-3">{idx + 1}</td>
+                <tr key={idx} className="border-t">
+                  <td className="p-3">{p.rank || idx + 1}</td>
                   <td className="p-3">{p.participant_name || 'Без имени'}</td>
                   <td className="p-3">{p.score}</td>
                 </tr>
               ))}
+              {leaderboard.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="p-3 text-center text-gray-500">Нет данных</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </Card>
 
         <h2 className="text-xl font-semibold mb-4">Статистика по вопросам</h2>
         <div className="space-y-3">
-          {questionsStats.map((stat) => (
-            <Card key={stat.question_id} className="p-4">
+          {questionsStats.map((stat, idx) => (
+            <Card key={stat.question_id || idx} className="p-4">
               <p className="font-medium">{stat.question_text}</p>
               <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
                 <div
@@ -106,6 +127,9 @@ const Results: React.FC = () => {
               </p>
             </Card>
           ))}
+          {questionsStats.length === 0 && (
+            <p className="text-center text-gray-500">Нет статистики по вопросам</p>
+          )}
         </div>
 
         <div className="mt-8 flex gap-4 justify-center">
