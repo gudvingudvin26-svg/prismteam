@@ -79,7 +79,11 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Nickname is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            base_session = QuizSession.objects.filter(code=code).exclude(status='completed').first()
+            base_session = QuizSession.objects.filter(code=code, participant_name__isnull=True).exclude(
+                status='completed').first()
+            if not base_session:
+                base_session = QuizSession.objects.filter(code=code).exclude(status='completed').first()
+
             if not base_session:
                 return Response({'error': 'Сессия с таким кодом не найдена или уже завершена'},
                                 status=status.HTTP_404_NOT_FOUND)
@@ -223,7 +227,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 })
 
             current_score = ParticipantAnswer.objects.filter(session=session, is_correct=True).count()
-            current_name = session.participant_name if session.participant_name else "Организатор"
+            current_name = session.participant_name if session.participant_name else "Участник"
             total_questions = session.quiz.questions.count()
 
             return Response({
@@ -232,6 +236,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'score': current_score,
                 'total_questions': total_questions,
                 'is_owner': is_owner,
+                'rank': 1,
                 'leaderboard': formatted_leaderboard
             })
         except Exception as e:
