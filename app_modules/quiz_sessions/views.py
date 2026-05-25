@@ -47,7 +47,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             timestamp_part = str(int(time.time() * 1000))[-3:]
             random_part = ''.join(random.choices(string.digits, k=3))
             code = timestamp_part + random_part
-            if not QuizSession.objects.filter(code=code).exists():
+            if not QuizSession.objects.filter(code=code, status='waiting').exists():
                 break
 
         try:
@@ -79,18 +79,23 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Nickname is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            session = QuizSession.objects.filter(code=code).exclude(status='completed').first()
-            if not session:
+            base_session = QuizSession.objects.filter(code=code).exclude(status='completed').first()
+            if not base_session:
                 return Response({'error': 'Сессия с таким кодом не найдена или уже завершена'},
                                 status=status.HTTP_404_NOT_FOUND)
 
-            session.participant_name = nickname
-            session.save(update_fields=['participant_name'])
+            new_session = QuizSession.objects.create(
+                quiz=base_session.quiz,
+                code=base_session.code,
+                participant_name=nickname,
+                status='active',
+                started_at=timezone.now()
+            )
 
             return Response({
-                'session_id': session.id,
-                'code': session.code,
-                'quiz_title': session.quiz.title
+                'session_id': new_session.id,
+                'code': new_session.code,
+                'quiz_title': new_session.quiz.title
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error_during_join': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -102,6 +107,10 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session.status = 'active'
             session.started_at = timezone.now()
             session.save()
+            QuizSession.objects.filter(code=session.code, status='waiting').update(
+                status='active',
+                started_at=timezone.now()
+            )
             return Response({'status': 'started'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -113,6 +122,10 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session.status = 'completed'
             session.ended_at = timezone.now()
             session.save()
+            QuizSession.objects.filter(code=session.code).update(
+                status='completed',
+                ended_at=timezone.now()
+            )
             return Response({'status': 'completed'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -154,11 +167,25 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             answers = ParticipantAnswer.objects.filter(session=session)
             total_questions = session.quiz.questions.count()
             correct_answers = answers.filter(is_correct=True).count()
+
+            all_sessions = QuizSession.objects.filter(code=session.code).exclude(participant_name__isnull=True)
+            leaderboard_data = []
+            for s in all_sessions:
+                score = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
+                leaderboard_data.append({'session_id': s.id, 'score': score})
+
+            leaderboard_data.sort(key=lambda x: x['score'], reverse=True)
+            rank = 1
+            for index, item in enumerate(leaderboard_data):
+                if item['session_id'] == session.id:
+                    rank = index + 1
+                    break
+
             return Response({
                 'score': correct_answers,
                 'total_questions': total_questions,
                 'correct_answers': correct_answers,
-                'rank': 1
+                'rank': rank
             })
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -171,17 +198,41 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            answers = ParticipantAnswer.objects.filter(session=session)
-            correct_answers = answers.filter(is_correct=True).count()
-            name = session.participant_name if session.participant_name else "Гость"
+            is_owner = False
+            if request.user.is_authenticated and session.quiz.created_by == request.user:
+                is_owner = True
 
-            return Response([{
+            all_sessions = QuizSession.objects.filter(code=session.code).exclude(participant_name__isnull=True)
+
+            leaderboard = []
+            for s in all_sessions:
+                score = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
+                leaderboard.append({
+                    'name': s.participant_name,
+                    'score': score
+                })
+
+            leaderboard.sort(key=lambda x: x['score'], reverse=True)
+
+            formatted_leaderboard = []
+            for index, item in enumerate(leaderboard):
+                formatted_leaderboard.append({
+                    'position': index + 1,
+                    'name': item['name'],
+                    'score': item['score']
+                })
+
+            current_score = ParticipantAnswer.objects.filter(session=session, is_correct=True).count()
+            current_name = session.participant_name if session.participant_name else "Организатор"
+
+            return Response({
                 'id': session.id,
-                'participant_name': name,
-                'score': correct_answers,
+                'participant_name': current_name,
+                'score': current_score,
                 'total_questions': session.quiz.questions.count(),
-                'rank': 1
-            }])
+                'is_owner': is_owner,
+                'leaderboard': formatted_leaderboard
+            })
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -195,9 +246,12 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             questions = session.quiz.questions.all()
             stats = []
+            related_sessions = QuizSession.objects.filter(code=session.code)
+
             for q in questions:
-                total_answers = ParticipantAnswer.objects.filter(session=session, question=q).count()
-                correct_count = ParticipantAnswer.objects.filter(session=session, question=q, is_correct=True).count()
+                total_answers = ParticipantAnswer.objects.filter(session__in=related_sessions, question=q).count()
+                correct_count = ParticipantAnswer.objects.filter(session__in=related_sessions, question=q,
+                                                                 is_correct=True).count()
                 correct_percent = int((correct_count / total_answers * 100)) if total_answers > 0 else 0
 
                 stats.append({

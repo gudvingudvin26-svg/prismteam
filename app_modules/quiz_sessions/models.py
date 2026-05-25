@@ -10,7 +10,7 @@ class QuizSession(models.Model):
     ]
 
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='sessions')
-    code = models.CharField(max_length=6, unique=True)
+    code = models.CharField(max_length=6, unique=False)
     participant_name = models.CharField(max_length=100, blank=True, null=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='waiting')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -21,7 +21,7 @@ class QuizSession(models.Model):
         db_table = 'quiz_session_v2'
 
     def __str__(self):
-        return f"{self.quiz.title} - {self.code}"
+        return f"{self.quiz.title} - {self.code} ({self.participant_name})"
 
 
 class ParticipantAnswer(models.Model):
