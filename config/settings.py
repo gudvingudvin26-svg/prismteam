@@ -121,3 +121,58 @@ LOGGING = {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
+        },
+        "quiz_log": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        }
+    }
+}
+
+LANGUAGE_CODE = 'en-us'
+
+TIME_ZONE = 'UTC'
+
+USE_I18N = True
+
+USE_TZ = True
+
+STATIC_URL = 'static/'
+
+AUTH_USER_MODEL = 'quiz.User'
+
+CORS_ALLOWED_ORIGINS = [
+    "https://prismteam-frontend.onrender.com",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+}
