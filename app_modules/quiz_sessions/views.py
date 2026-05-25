@@ -26,7 +26,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         return QuizSession.objects.none()
 
     def create(self, request, *args, **kwargs):
-        quiz_id = request.data.get('quiz')
+        quiz_id = request.data.get('quiz') or request.data.get('quiz_id')
         if not quiz_id:
             return Response({'error': 'quiz_id is required'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -43,9 +43,12 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error_at_quiz_fetch': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        timestamp_part = str(int(time.time() * 1000))[-3:]
-        random_part = ''.join(random.choices(string.digits, k=3))
-        code = timestamp_part + random_part
+        while True:
+            timestamp_part = str(int(time.time() * 1000))[-3:]
+            random_part = ''.join(random.choices(string.digits, k=3))
+            code = timestamp_part + random_part
+            if not QuizSession.objects.filter(code=code).exists():
+                break
 
         try:
             session = QuizSession.objects.create(
@@ -80,6 +83,9 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             if not session:
                 return Response({'error': 'Сессия с таким кодом не найдена или уже завершена'},
                                 status=status.HTTP_404_NOT_FOUND)
+
+            session.participant_name = nickname
+            session.save(update_fields=['participant_name'])
 
             return Response({
                 'session_id': session.id,
@@ -165,10 +171,14 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
+            answers = ParticipantAnswer.objects.filter(session=session)
+            correct_answers = answers.filter(is_correct=True).count()
+            name = session.participant_name if session.participant_name else "Гость"
+
             return Response([{
                 'id': session.id,
-                'participant_name': 'Участник',
-                'score': 0,
+                'participant_name': name,
+                'score': correct_answers,
                 'total_questions': session.quiz.questions.count(),
                 'rank': 1
             }])
@@ -184,24 +194,30 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
         try:
             questions = session.quiz.questions.all()
-            stats = [{
-                'question_id': q.id,
-                'question_text': q.text,
-                'total_answers': 0,
-                'correct_count': 0,
-                'correct_percent': 0
-            } for q in questions]
+            stats = []
+            for q in questions:
+                total_answers = ParticipantAnswer.objects.filter(session=session, question=q).count()
+                correct_count = ParticipantAnswer.objects.filter(session=session, question=q, is_correct=True).count()
+                correct_percent = int((correct_count / total_answers * 100)) if total_answers > 0 else 0
+
+                stats.append({
+                    'question_id': q.id,
+                    'question_text': q.text,
+                    'total_answers': total_answers,
+                    'correct_count': correct_count,
+                    'correct_percent': correct_percent
+                })
             return Response(stats)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            session = self.get_object()
-        except Exception:
+            session = QuizSession.objects.get(id=kwargs.get('pk'))
+        except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if not request.user.is_authenticated:
+        if not request.user.is_authenticated or session.quiz.created_by != request.user:
             return Response({
                 'id': session.id,
                 'code': session.code,

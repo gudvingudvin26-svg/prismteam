@@ -18,7 +18,6 @@ class QuizSession(models.Model):
     ended_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        # Новое уникальное имя таблицы, которое PostgreSQL создаст с нуля
         db_table = 'quiz_session_v2'
 
     def __str__(self):
@@ -33,7 +32,6 @@ class ParticipantAnswer(models.Model):
     answered_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        # Новое уникальное имя таблицы для ответов
         db_table = 'participant_answer_v2'
 
     def __str__(self):
