@@ -174,45 +174,62 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
-            return Response([])
+            return Response({'id': 0, 'leaderboard': []})
 
         try:
-            # Берём абсолютно все связанные сессии по коду комнаты
+            # Имя текущего игрока/сессии
+            current_name = session.participant_name if session.participant_name else "Организатор"
+            current_score = ParticipantAnswer.objects.filter(session=session, is_correct=True).count()
+            total_questions = session.quiz.questions.count()
+
+            # Исключаем пустые сессии организатора, где не было ответов, чтобы избежать дублей
             all_sessions = QuizSession.objects.filter(code=session.code)
 
-            leaderboard = []
+            players_data = {}
             for s in all_sessions:
+                name = s.participant_name if s.participant_name else "Организатор"
                 score = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
 
-                # Присваиваем валидное имя участника
-                if s.participant_name:
-                    name = s.participant_name
-                elif s.quiz.created_by:
-                    name = s.quiz.created_by.username
-                else:
-                    name = "Организатор"
+                # Если у организатора 0 ответов и есть другие игроки — не выводим его как дубликат
+                if name == "Организатор" and score == 0 and all_sessions.exclude(
+                        participant_name__isnull=True).exists():
+                    continue
 
-                leaderboard.append({
-                    'name': name,
-                    'score': score
-                })
+                # Сохраняем максимальный результат для каждого уникального имени
+                if name not in players_data or score > players_data[name]:
+                    players_data[name] = score
 
-            # Сортируем участников по убыванию баллов
+            # Формируем список лидеров
+            leaderboard = [{'name': k, 'score': v} for k, v in players_data.items()]
             leaderboard.sort(key=lambda x: x['score'], reverse=True)
 
             formatted_leaderboard = []
+            current_player_rank = 1
             for index, item in enumerate(leaderboard):
                 formatted_leaderboard.append({
                     'position': index + 1,
+                    'rank': index + 1,
                     'name': item['name'],
-                    'participant_name': item['name'],  # Дублируем для совместимости свойств
-                    'score': item['score']
+                    'participant_name': item['name'],
+                    'score': item['score'],
+                    'total_questions': total_questions
                 })
+                if item['name'] == current_name:
+                    current_player_rank = index + 1
 
-            # СТРОГО возвращаем массив, чтобы .map() на фронтенде никогда не падал в фиолетовый экран
-            return Response(formatted_leaderboard)
+            # Возвращаем полноценный OBJECT, содержащий метаданные И корректный массив leaderboard
+            return Response({
+                'id': session.id,
+                'participant_name': current_name,
+                'name': current_name,
+                'score': current_score,
+                'correct_answers': current_score,
+                'total_questions': total_questions,
+                'rank': current_player_rank,
+                'leaderboard': formatted_leaderboard
+            })
         except Exception:
-            return Response([])
+            return Response({'id': int(pk) if str(pk).isdigit() else 0, 'leaderboard': []})
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def questions_stats(self, request, pk=None):
