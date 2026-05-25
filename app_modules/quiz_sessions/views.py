@@ -63,11 +63,29 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'status': session.status
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
-            return Response({
-                'error_at_session_create': str(e),
-                'attempted_code': code,
-                'quiz_id': quiz.id
-            }, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO quiz_sessions_quizsession (quiz_id, code, status, started_at) "
+                        "VALUES (%s, %s, %s::quiz_status, NOW()) RETURNING id;",
+                        [quiz.id, code, 'waiting']
+                    )
+                    row = cursor.fetchone()
+                    session_id = row[0]
+
+                return Response({
+                    'id': session_id,
+                    'code': code,
+                    'quiz': quiz.id,
+                    'status': 'waiting'
+                }, status=status.HTTP_201_CREATED)
+            except Exception as raw_enum_error:
+                return Response({
+                    'error_at_session_create': str(e),
+                    'fallback_error': str(raw_enum_error),
+                    'hint': 'Убедитесь, что значение "waiting" присутствует в вашем ENUM на уровне базы данных.'
+                }, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny()], url_path='join')
     def join(self, request):
