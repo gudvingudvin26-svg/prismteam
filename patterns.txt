@@ -1,0 +1,16 @@
+Project patterns
+================
+
+1. Repository (Репозиторий)
+   - Расположение: app_modules/quiz/repositories.py
+   - Базовый класс: BaseRepository[T] – обобщённые CRUD-операции.
+   - Реализации:
+        * QuizRepository – получение квизов пользователя с оптимизацией запросов, публикация.
+        * QuestionRepository – получение вопросов пользователя.
+        * AnswerOptionRepository – получение вариантов ответов пользователя.
+   - Используется в: QuizViewSet, QuestionViewSet, AnswerOptionViewSet (вместо прямых запросов к ORM).
+
+2. Factory (Фабрика)
+   - Расположение: app_modules/quiz/factories.py
+   - Класс: QuizFactory – фабричный метод create_quiz(data, user) для создания объекта Quiz с валидацией через сериализатор.
+   - Используется в: QuizViewSet.perform_create (создание квиза через фабрику).
