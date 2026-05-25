@@ -3,8 +3,6 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from .redis_utils import get_timer_manager
-from .models import Quiz, Question, AnswerOption
-from .serializers import QuestionSerializer
 
 
 class QuizConsumer(AsyncWebsocketConsumer):
@@ -183,6 +181,7 @@ class QuizConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _get_quiz_timer_duration(self) -> int:
+        from .models import Quiz
         try:
             quiz = Quiz.objects.get(id=self.quiz_id)
             return quiz.timer if quiz.timer else 30
@@ -191,6 +190,8 @@ class QuizConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _get_question_data(self, question_number: int) -> dict | None:
+        from .models import Question
+        from .serializers import QuestionSerializer
         try:
             questions = Question.objects.filter(quiz_id=self.quiz_id).order_by('order')
             if question_number <= len(questions):
@@ -203,6 +204,7 @@ class QuizConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _verify_answer(self, answer_id: int, remaining_time: int) -> tuple[bool, int]:
+        from .models import AnswerOption
         try:
             option = AnswerOption.objects.get(id=answer_id)
             if option.is_correct:

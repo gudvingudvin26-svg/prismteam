@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.shortcuts import redirect
 from rest_framework.routers import DefaultRouter
 
 from app_modules.quiz.views import (
@@ -16,6 +17,7 @@ router.register(r'answers', AnswerOptionViewSet, basename='answerooption')
 router.register(r'sessions', QuizSessionViewSet, basename='session')
 
 urlpatterns = [
+    path('', lambda request: redirect('/api/organizer/quizzes/')),
     path('admin/', admin.site.urls),
     path('registration/', UserRegistration.as_view(), name='registration'),
     path('login/', UserLogin.as_view(), name='login'),
