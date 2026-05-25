@@ -165,7 +165,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                     'chosen_answer_id': ans.answer.id if ans.answer else None,
                     'is_correct': ans.is_correct
                 })
-
             return Response(result_list)
         except Exception:
             return Response([])
@@ -175,14 +174,9 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
-            return Response({'id': int(pk) if pk.isdigit() else 0, 'leaderboard': [], 'error': 'Session not found'},
-                            status=status.HTTP_200_OK)
+            return Response([])
 
         try:
-            is_owner = False
-            if request.user.is_authenticated and session.quiz.created_by == request.user:
-                is_owner = True
-
             all_sessions = QuizSession.objects.filter(code=session.code).exclude(participant_name__isnull=True)
 
             leaderboard = []
@@ -195,40 +189,18 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
             leaderboard.sort(key=lambda x: x['score'], reverse=True)
 
+            # Теперь возвращаем СТРОГО чистый массив (Array), как ожидает фронтенд для метода .map()
             formatted_leaderboard = []
-            current_player_rank = 1
             for index, item in enumerate(leaderboard):
                 formatted_leaderboard.append({
                     'position': index + 1,
                     'name': item['name'],
                     'score': item['score']
                 })
-                if session.participant_name and session.participant_name == item['name']:
-                    current_player_rank = index + 1
 
-            current_score = ParticipantAnswer.objects.filter(session=session, is_correct=True).count()
-            current_name = session.participant_name if session.participant_name else "Организатор"
-            total_questions = session.quiz.questions.count()
-
-            return Response({
-                'id': session.id,
-                'participant_name': current_name,
-                'score': current_score,
-                'total_questions': total_questions,
-                'is_owner': is_owner,
-                'rank': current_player_rank,
-                'leaderboard': formatted_leaderboard
-            })
+            return Response(formatted_leaderboard)
         except Exception:
-            return Response({
-                'id': session.id,
-                'participant_name': "Организатор",
-                'score': 0,
-                'total_questions': 0,
-                'is_owner': False,
-                'rank': 1,
-                'leaderboard': []
-            })
+            return Response([])
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def questions_stats(self, request, pk=None):
