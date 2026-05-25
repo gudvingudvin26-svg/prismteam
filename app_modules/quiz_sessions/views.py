@@ -152,41 +152,31 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
-            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response([])
 
         try:
             answers = ParticipantAnswer.objects.filter(session=session)
-            total_questions = session.quiz.questions.count()
-            correct_answers = answers.filter(is_correct=True).count()
+            result_list = []
 
-            all_sessions = QuizSession.objects.filter(code=session.code).exclude(participant_name__isnull=True)
-            leaderboard_data = []
-            for s in all_sessions:
-                score = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
-                leaderboard_data.append({'session_id': s.id, 'score': score})
+            for ans in answers:
+                result_list.append({
+                    'question_id': ans.question.id,
+                    'question_text': ans.question.text,
+                    'chosen_answer_id': ans.answer.id if ans.answer else None,
+                    'is_correct': ans.is_correct
+                })
 
-            leaderboard_data.sort(key=lambda x: x['score'], reverse=True)
-            rank = 1
-            for index, item in enumerate(leaderboard_data):
-                if item['session_id'] == session.id:
-                    rank = index + 1
-                    break
-
-            return Response({
-                'score': correct_answers,
-                'total_questions': total_questions,
-                'correct_answers': correct_answers,
-                'rank': rank
-            })
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(result_list)
+        except Exception:
+            return Response([])
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def results(self, request, pk=None):
         try:
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
-            return Response({'id': int(pk) if pk.isdigit() else 0, 'leaderboard': [], 'error': 'Session not found'}, status=status.HTTP_200_OK)
+            return Response({'id': int(pk) if pk.isdigit() else 0, 'leaderboard': [], 'error': 'Session not found'},
+                            status=status.HTTP_200_OK)
 
         try:
             is_owner = False
@@ -232,7 +222,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         except Exception:
             return Response({
                 'id': session.id,
-                'participant_name': "Участник",
+                'participant_name': "Организатор",
                 'score': 0,
                 'total_questions': 0,
                 'is_owner': False,
