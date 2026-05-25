@@ -17,6 +17,7 @@ from .models import User, Quiz, Question, AnswerOption
 from .serializers import UserSerializer, QuizSerializer, QuestionSerializer, AnswerOptionSerializer
 from .validators import validate_quiz_integrity
 from .repositories import QuizRepository, QuestionRepository, AnswerOptionRepository
+from .factories import QuizFactory
 
 login_log = logging.getLogger('login_log')
 user = None
@@ -284,7 +285,8 @@ class QuizViewSet(viewsets.ModelViewSet):
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        quiz = QuizFactory.create_quiz(serializer.validated_data, self.request.user)
+        serializer.instance = quiz
 
 
 class QuestionViewSet(viewsets.ModelViewSet):
