@@ -16,9 +16,11 @@ from config import settings
 from .models import User, Quiz, Question, AnswerOption
 from .serializers import UserSerializer, QuizSerializer, QuestionSerializer, AnswerOptionSerializer
 from .validators import validate_quiz_integrity
+from .repositories import QuizRepository, QuestionRepository, AnswerOptionRepository
 
 login_log = logging.getLogger('login_log')
 user = None
+
 
 class UserRegistration(APIView):
     def post(self, request):
@@ -233,20 +235,27 @@ class UserLoginAPI(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class GetCurrentUserAPI(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name
+        }, status=status.HTTP_200_OK)
+
+
 class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
+    quiz_repo = QuizRepository()
 
     def get_queryset(self):
-        user = self.request.user
-        return Quiz.objects.filter(
-            created_by=user
-        ).prefetch_related(
-            Prefetch(
-                'questions',
-                queryset=Question.objects.select_related('quiz').prefetch_related('answer_options')
-            )
-        ).select_related('created_by').order_by('-id')
+        return self.quiz_repo.get_all_for_user(self.request.user)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -268,7 +277,7 @@ class QuizViewSet(viewsets.ModelViewSet):
     def publish(self, request, pk=None):
         quiz = self.get_object()
         try:
-            validate_quiz_integrity(quiz, use_drf_exception=True)
+            self.quiz_repo.publish(quiz)
             return Response({"status": "Квиз успешно прошел валидацию и готов к публикации."},
                             status=status.HTTP_200_OK)
         except ValidationError as e:
@@ -281,32 +290,16 @@ class QuizViewSet(viewsets.ModelViewSet):
 class QuestionViewSet(viewsets.ModelViewSet):
     serializer_class = QuestionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    question_repo = QuestionRepository()
 
     def get_queryset(self):
-        user = self.request.user
-        return Question.objects.filter(
-            quiz__created_by=user
-        ).select_related('quiz').prefetch_related('answer_options')
+        return self.question_repo.get_all_for_user(self.request.user)
 
 
 class AnswerOptionViewSet(viewsets.ModelViewSet):
     serializer_class = AnswerOptionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    answer_repo = AnswerOptionRepository()
 
     def get_queryset(self):
-        user = self.request.user
-        return AnswerOption.objects.filter(
-            question__quiz__created_by=user
-        ).select_related('question__quiz')
-class GetCurrentUserAPI(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-        return Response({
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'first_name': user.first_name,
-            'last_name': user.last_name
-        }, status=status.HTTP_200_OK)
+        return self.answer_repo.get_all_for_user(self.request.user)
