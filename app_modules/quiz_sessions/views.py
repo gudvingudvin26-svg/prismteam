@@ -65,7 +65,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({
                 'error_at_session_create': str(e),
-                'hint': 'Если ошибка сообщает "relation does not exist", убедитесь, что вы применили последние миграции с измененным именем таблицы.'
+                'hint': 'Убедитесь, что миграции применились успешно.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny()], url_path='join')
@@ -224,12 +224,13 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
             current_score = ParticipantAnswer.objects.filter(session=session, is_correct=True).count()
             current_name = session.participant_name if session.participant_name else "Организатор"
+            total_questions = session.quiz.questions.count()
 
             return Response({
                 'id': session.id,
                 'participant_name': current_name,
                 'score': current_score,
-                'total_questions': session.quiz.questions.count(),
+                'total_questions': total_questions,
                 'is_owner': is_owner,
                 'leaderboard': formatted_leaderboard
             })

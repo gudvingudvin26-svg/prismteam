@@ -18,7 +18,7 @@ class QuizSession(models.Model):
     ended_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = 'quiz_session_v2'
+        db_table = 'quiz_session'
 
     def __str__(self):
         return f"{self.quiz.title} - {self.code} ({self.participant_name})"
@@ -32,7 +32,7 @@ class ParticipantAnswer(models.Model):
     answered_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'participant_answer_v2'
+        db_table = 'participant_answer'
 
     def __str__(self):
         return f"{self.session.code} - Q{self.question.id}: {self.is_correct}"
