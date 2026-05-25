@@ -26,11 +26,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         return QuizSession.objects.none()
 
     def create(self, request, *args, **kwargs):
-        print("=== CREATE SESSION ===")
-        print("Request data:", request.data)
-        print("User:", request.user)
-        print("User authenticated:", request.user.is_authenticated)
-
         quiz_id = request.data.get('quiz')
         if not quiz_id:
             return Response({'error': 'quiz_id is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -55,8 +50,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             status='waiting'
         )
 
-        print(f"Session created: id={session.id}, code={session.code}")
-
         return Response({
             'id': session.id,
             'code': session.code,
@@ -69,10 +62,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         code = request.data.get('code')
         nickname = request.data.get('nickname')
 
-        print(f"=== JOIN SESSION ===")
-        print(f"Code: {code}")
-        print(f"Nickname: {nickname}")
-
         if not code:
             return Response({'error': 'Code is required'}, status=status.HTTP_400_BAD_REQUEST)
         if not nickname:
@@ -83,14 +72,12 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session.participant_name = nickname
             session.save()
 
-            print(f"Session {session.id} updated with name: {nickname}")
             return Response({
                 'session_id': session.id,
                 'code': session.code,
                 'quiz_title': session.quiz.title
             }, status=status.HTTP_200_OK)
         except QuizSession.DoesNotExist:
-            print(f"Session with code {code} not found")
             return Response({'error': 'Сессия с таким кодом не найдена'}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['post'])
