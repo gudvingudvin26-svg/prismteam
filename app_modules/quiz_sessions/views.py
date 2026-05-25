@@ -21,9 +21,8 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        if self.request.user.is_authenticated:
-            return QuizSession.objects.filter(quiz__created_by=self.request.user)
-        return QuizSession.objects.none()
+        # Разрешаем поиск любых сессий по ID, чтобы анонимные игроки не получали 404 ошибку
+        return QuizSession.objects.all()
 
     def create(self, request, *args, **kwargs):
         quiz_id = request.data.get('quiz') or request.data.get('quiz_id')
@@ -100,22 +99,26 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
         try:
-            session = self.get_object()
+            session = QuizSession.objects.get(id=pk)
             session.status = 'active'
             session.started_at = timezone.now()
             session.save()
             return Response({'status': 'started'})
+        except QuizSession.DoesNotExist:
+            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def end(self, request, pk=None):
         try:
-            session = self.get_object()
+            session = QuizSession.objects.get(id=pk)
             session.status = 'completed'
             session.ended_at = timezone.now()
             session.save()
             return Response({'status': 'completed'})
+        except QuizSession.DoesNotExist:
+            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -265,6 +268,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Безопасный публичный ответ для участников, чтобы у них не падал GET /api/quiz-sessions/{id}
         if not request.user.is_authenticated or session.quiz.created_by != request.user:
             return Response({
                 'id': session.id,
