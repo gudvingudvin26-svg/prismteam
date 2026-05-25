@@ -37,25 +37,37 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             from app_modules.quiz.models import Quiz
             quiz = Quiz.objects.get(id=quiz_id, created_by=request.user)
         except Quiz.DoesNotExist:
-            return Response({'error': 'Quiz not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': f'Quiz with id {quiz_id} not found for this user'},
+                            status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error_at_quiz_fetch': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         code = ''.join(random.choices(string.digits, k=6))
 
-        while QuizSession.objects.filter(code=code).exists():
-            code = ''.join(random.choices(string.digits, k=6))
+        try:
+            while QuizSession.objects.filter(code=code).exists():
+                code = ''.join(random.choices(string.digits, k=6))
+        except Exception as e:
+            return Response({'error_at_code_check': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        session = QuizSession.objects.create(
-            quiz=quiz,
-            code=code,
-            status='waiting'
-        )
-
-        return Response({
-            'id': session.id,
-            'code': session.code,
-            'quiz': session.quiz.id,
-            'status': session.status
-        }, status=status.HTTP_201_CREATED)
+        try:
+            session = QuizSession.objects.create(
+                quiz=quiz,
+                code=code,
+                status='waiting'
+            )
+            return Response({
+                'id': session.id,
+                'code': session.code,
+                'quiz': session.quiz.id,
+                'status': session.status
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({
+                'error_at_session_create': str(e),
+                'attempted_code': code,
+                'quiz_id': quiz.id
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny()], url_path='join')
     def join(self, request):
@@ -69,8 +81,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
         try:
             session = QuizSession.objects.get(code=code, status='waiting')
-            session.participant_name = nickname
-            session.save()
 
             return Response({
                 'session_id': session.id,
@@ -79,6 +89,8 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_200_OK)
         except QuizSession.DoesNotExist:
             return Response({'error': 'Сессия с таким кодом не найдена'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error_during_join': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
@@ -177,7 +189,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         for s in all_sessions:
             correct = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
             scores[s.id] = correct
-            if s.participant_name:
+            if hasattr(s, 'participant_name') and s.participant_name:
                 participant_names[s.id] = s.participant_name
 
         sorted_sessions = sorted(all_sessions, key=lambda x: scores[x.id], reverse=True)
