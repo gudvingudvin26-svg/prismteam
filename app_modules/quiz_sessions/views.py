@@ -63,43 +63,36 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'status': session.status
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
-            return Response({
-                'error_at_session_create': str(e),
-                'hint': 'Убедитесь, что миграции применились успешно.'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error_at_session_create': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny()], url_path='join')
     def join(self, request):
         code = request.data.get('code')
         nickname = request.data.get('nickname')
 
-        if not code:
-            return Response({'error': 'Code is required'}, status=status.HTTP_400_BAD_REQUEST)
-        if not nickname:
-            return Response({'error': 'Nickname is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not code or not nickname:
+            return Response({'error': 'Code and nickname are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            base_session = QuizSession.objects.filter(code=code, participant_name__isnull=True).exclude(
-                status='completed').first()
-            if not base_session:
-                base_session = QuizSession.objects.filter(code=code).exclude(status='completed').first()
+            master_session = QuizSession.objects.filter(code=code, participant_name__isnull=True).first()
+            if not master_session:
+                master_session = QuizSession.objects.filter(code=code).first()
 
-            if not base_session:
-                return Response({'error': 'Сессия с таким кодом не найдена или уже завершена'},
-                                status=status.HTTP_404_NOT_FOUND)
+            if not master_session:
+                return Response({'error': 'Сессия с таким кодом не найдена'}, status=status.HTTP_404_NOT_FOUND)
 
-            new_session = QuizSession.objects.create(
-                quiz=base_session.quiz,
-                code=base_session.code,
+            player_session = QuizSession.objects.create(
+                quiz=master_session.quiz,
+                code=master_session.code,
                 participant_name=nickname,
                 status='active',
                 started_at=timezone.now()
             )
 
             return Response({
-                'session_id': new_session.id,
-                'code': new_session.code,
-                'quiz_title': new_session.quiz.title
+                'session_id': player_session.id,
+                'code': player_session.code,
+                'quiz_title': player_session.quiz.title
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error_during_join': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -111,10 +104,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session.status = 'active'
             session.started_at = timezone.now()
             session.save()
-            QuizSession.objects.filter(code=session.code, status='waiting').update(
-                status='active',
-                started_at=timezone.now()
-            )
             return Response({'status': 'started'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -126,10 +115,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session.status = 'completed'
             session.ended_at = timezone.now()
             session.save()
-            QuizSession.objects.filter(code=session.code).update(
-                status='completed',
-                ended_at=timezone.now()
-            )
             return Response({'status': 'completed'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -219,15 +204,18 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             leaderboard.sort(key=lambda x: x['score'], reverse=True)
 
             formatted_leaderboard = []
+            current_player_rank = 1
             for index, item in enumerate(leaderboard):
                 formatted_leaderboard.append({
                     'position': index + 1,
                     'name': item['name'],
                     'score': item['score']
                 })
+                if session.participant_name and session.participant_name == item['name']:
+                    current_player_rank = index + 1
 
             current_score = ParticipantAnswer.objects.filter(session=session, is_correct=True).count()
-            current_name = session.participant_name if session.participant_name else "Участник"
+            current_name = session.participant_name if session.participant_name else "Организатор"
             total_questions = session.quiz.questions.count()
 
             return Response({
@@ -236,7 +224,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'score': current_score,
                 'total_questions': total_questions,
                 'is_owner': is_owner,
-                'rank': 1,
+                'rank': current_player_rank,
                 'leaderboard': formatted_leaderboard
             })
         except Exception as e:
