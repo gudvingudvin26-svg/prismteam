@@ -54,7 +54,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session = QuizSession.objects.create(
                 quiz=quiz,
                 code=code,
-                status='waiting'
+                status='preparation'
             )
             return Response({
                 'id': session.id,
@@ -63,29 +63,10 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'status': session.status
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
-            try:
-                from django.db import connection
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        "INSERT INTO quiz_sessions_quizsession (quiz_id, code, status, started_at) "
-                        "VALUES (%s, %s, %s::quiz_status, NOW()) RETURNING id;",
-                        [quiz.id, code, 'waiting']
-                    )
-                    row = cursor.fetchone()
-                    session_id = row[0]
-
-                return Response({
-                    'id': session_id,
-                    'code': code,
-                    'quiz': quiz.id,
-                    'status': 'waiting'
-                }, status=status.HTTP_201_CREATED)
-            except Exception as raw_enum_error:
-                return Response({
-                    'error_at_session_create': str(e),
-                    'fallback_error': str(raw_enum_error),
-                    'hint': 'Убедитесь, что значение "waiting" присутствует в вашем ENUM на уровне базы данных.'
-                }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'error_at_session_create': str(e),
+                'hint': 'Проверьте, какие значения принимает quiz_status в вашей БД (например: preparation, active, completed).'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny()], url_path='join')
     def join(self, request):
@@ -98,15 +79,16 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Nickname is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            session = QuizSession.objects.get(code=code, status='waiting')
+            session = QuizSession.objects.filter(code=code).exclude(status='completed').first()
+            if not session:
+                return Response({'error': 'Сессия с таким кодом не найдена или завершена'},
+                                status=status.HTTP_404_NOT_FOUND)
 
             return Response({
                 'session_id': session.id,
                 'code': session.code,
                 'quiz_title': session.quiz.title
             }, status=status.HTTP_200_OK)
-        except QuizSession.DoesNotExist:
-            return Response({'error': 'Сессия с таким кодом не найдена'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error_during_join': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
