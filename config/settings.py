@@ -17,10 +17,10 @@ ALLOWED_HOSTS = [
 ]
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
     'django.contrib.contenttypes',
+    'django.contrib.auth',
     'django.contrib.sessions',
+    'django.contrib.admin',
     'corsheaders',
     'django.contrib.messages',
     'django.contrib.staticfiles',
@@ -91,7 +91,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LOG_DIR = os.path.join(BASE_DIR, 'app_modules', 'quiz', 'Logging')
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -102,7 +102,11 @@ LOGGING = {
         "simple": {
             "format": '{asctime} - {levelname} - {message}',
             "style": "{",
-        }
+        },
+        "verbose": {
+            "format": '[{asctime}] {levelname} {name} ({filename}:{lineno}): {message}',
+            "style": "{",
+        },
     },
     "filters": {
         "info_or_error": {
@@ -114,7 +118,31 @@ LOGGING = {
             "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "simple",
-        }
+        },
+        "ws_file": {
+            "level": "DEBUG",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, 'websocket.log'),
+            "formatter": "verbose",
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 3,
+        },
+        "app_file": {
+            "level": "DEBUG",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, 'app.log'),
+            "formatter": "verbose",
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 5,
+        },
+        "error_file": {
+            "level": "ERROR",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, 'error.log'),
+            "formatter": "verbose",
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 3,
+        },
     },
     'loggers': {
         "login_log": {
@@ -126,8 +154,18 @@ LOGGING = {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
-        }
-    }
+        },
+        "ws": {
+            "handlers": ["ws_file", "app_file", "console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["error_file", "app_file"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
 }
 
 LANGUAGE_CODE = 'en-us'
