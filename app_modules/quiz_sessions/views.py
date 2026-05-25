@@ -7,7 +7,6 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import QuizSession, ParticipantAnswer
 from .serializers import QuizSessionSerializer
-from app_modules.quiz.models import Question, AnswerOption
 
 quiz_log = logging.getLogger('quiz_log')
 
@@ -33,28 +32,42 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         if not request.user.is_authenticated:
             return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
 
+        # Безопасное получение квиза
         try:
             from app_modules.quiz.models import Quiz
-            quiz = Quiz.objects.get(id=quiz_id, created_by=request.user)
-        except Quiz.DoesNotExist:
-            return Response({'error': f'Quiz with id {quiz_id} not found for this user'},
-                            status=status.HTTP_404_NOT_FOUND)
+            # Проверяем, существует ли вообще такой квиз
+            quiz_exists = Quiz.objects.filter(id=quiz_id).exists()
+            if not quiz_exists:
+                return Response({'error': f'Квиз с ID {quiz_id} не существует в базе данных'},
+                                status=status.HTTP_404_NOT_FOUND)
+
+            # Проверяем, принадлежит ли он текущему пользователю
+            quiz = Quiz.objects.filter(id=quiz_id, created_by=request.user).first()
+            if not quiz:
+                return Response({
+                    'error': f'Квиз с ID {quiz_id} принадлежит другому пользователю. Вы не можете создать для него сессию.'
+                }, status=status.HTTP_403_FORBIDDEN)
+
         except Exception as e:
-            return Response({'error_at_quiz_fetch': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error_at_quiz_fetch': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        code = ''.join(random.choices(string.digits, k=6))
-
+        # Безопасная генерация уникального кода
         try:
-            while QuizSession.objects.filter(code=code).exists():
+            code = ''.join(random.choices(string.digits, k=6))
+            # Ограничим цикл 10 попытками, чтобы избежать бесконечного зависания
+            attempts = 0
+            while QuizSession.objects.filter(code=code).exists() and attempts < 10:
                 code = ''.join(random.choices(string.digits, k=6))
+                attempts += 1
         except Exception as e:
-            return Response({'error_at_code_check': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error_at_code_check': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Создание сессии со статусом, который поддерживает ваша БД
         try:
             session = QuizSession.objects.create(
                 quiz=quiz,
                 code=code,
-                status='preparation'
+                status='preparation'  # Используем стандартный стартовый статус
             )
             return Response({
                 'id': session.id,
@@ -65,7 +78,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({
                 'error_at_session_create': str(e),
-                'hint': 'Проверьте, какие значения принимает quiz_status в вашей БД (например: preparation, active, completed).'
+                'hint': 'Если ошибка связана со статусом, убедитесь, что "preparation" или "waiting" есть в вашем ENUM в PostgreSQL.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny()], url_path='join')
@@ -81,7 +94,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             session = QuizSession.objects.filter(code=code).exclude(status='completed').first()
             if not session:
-                return Response({'error': 'Сессия с таким кодом не найдена или завершена'},
+                return Response({'error': 'Сессия с таким кодом не найдена или уже завершена'},
                                 status=status.HTTP_404_NOT_FOUND)
 
             return Response({
@@ -90,25 +103,31 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'quiz_title': session.quiz.title
             }, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({'error_during_join': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error_during_join': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
-        session = self.get_object()
-        session.status = 'active'
-        session.started_at = timezone.now()
-        session.save()
-        quiz_log.info(f"Session {session.id} started successfully")
-        return Response({'status': 'started'})
+        try:
+            session = self.get_object()
+            session.status = 'active'
+            session.started_at = timezone.now()
+            session.save()
+            quiz_log.info(f"Session {session.id} started successfully")
+            return Response({'status': 'started'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def end(self, request, pk=None):
-        session = self.get_object()
-        session.status = 'completed'
-        session.ended_at = timezone.now()
-        session.save()
-        quiz_log.info(f"Session {session.id} ended successfully")
-        return Response({'status': 'completed'})
+        try:
+            session = self.get_object()
+            session.status = 'completed'
+            session.ended_at = timezone.now()
+            session.save()
+            quiz_log.info(f"Session {session.id} ended successfully")
+            return Response({'status': 'completed'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny()])
     def answer(self, request, pk=None):
@@ -121,6 +140,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         answer_id = request.data.get('answer_id')
 
         try:
+            from app_modules.quiz.models import Question, AnswerOption
             question = Question.objects.get(id=question_id)
             answer = AnswerOption.objects.get(id=answer_id) if answer_id and answer_id != -1 else None
             is_correct = answer.is_correct if answer and answer_id != -1 else False
@@ -136,8 +156,8 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'status': 'answer received',
                 'is_correct': is_correct
             })
-        except Question.DoesNotExist:
-            return Response({'error': 'Question not found'}, status=404)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def my_result(self, request, pk=None):
@@ -146,32 +166,35 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        answers = ParticipantAnswer.objects.filter(session=session)
-        total_questions = session.quiz.questions.count()
-        correct_answers = answers.filter(is_correct=True).count()
+        try:
+            answers = ParticipantAnswer.objects.filter(session=session)
+            total_questions = session.quiz.questions.count()
+            correct_answers = answers.filter(is_correct=True).count()
 
-        all_sessions = QuizSession.objects.filter(quiz=session.quiz)
-        all_answers = ParticipantAnswer.objects.filter(session__in=all_sessions)
+            all_sessions = QuizSession.objects.filter(quiz=session.quiz)
+            all_answers = ParticipantAnswer.objects.filter(session__in=all_sessions)
 
-        from collections import defaultdict
-        scores = defaultdict(int)
-        for ans in all_answers:
-            if ans.is_correct:
-                scores[ans.session.id] += 1
+            from collections import defaultdict
+            scores = defaultdict(int)
+            for ans in all_answers:
+                if ans.is_correct:
+                    scores[ans.session.id] += 1
 
-        sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        rank = 1
-        for i, (sid, score) in enumerate(sorted_scores):
-            if sid == session.id:
-                rank = i + 1
-                break
+            sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+            rank = 1
+            for i, (sid, score) in enumerate(sorted_scores):
+                if sid == session.id:
+                    rank = i + 1
+                    break
 
-        return Response({
-            'score': correct_answers,
-            'total_questions': total_questions,
-            'correct_answers': correct_answers,
-            'rank': rank
-        })
+            return Response({
+                'score': correct_answers,
+                'total_questions': total_questions,
+                'correct_answers': correct_answers,
+                'rank': rank
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def results(self, request, pk=None):
@@ -180,32 +203,34 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        all_sessions = QuizSession.objects.filter(quiz=session.quiz)
+        try:
+            all_sessions = QuizSession.objects.filter(quiz=session.quiz)
+            from collections import defaultdict
+            scores = defaultdict(int)
+            participant_names = defaultdict(str)
 
-        from collections import defaultdict
-        scores = defaultdict(int)
-        participant_names = defaultdict(str)
+            for s in all_sessions:
+                correct = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
+                scores[s.id] = correct
+                if hasattr(s, 'participant_name') and s.participant_name:
+                    participant_names[s.id] = s.participant_name
 
-        for s in all_sessions:
-            correct = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
-            scores[s.id] = correct
-            if hasattr(s, 'participant_name') and s.participant_name:
-                participant_names[s.id] = s.participant_name
+            sorted_sessions = sorted(all_sessions, key=lambda x: scores[x.id], reverse=True)
 
-        sorted_sessions = sorted(all_sessions, key=lambda x: scores[x.id], reverse=True)
+            results = []
+            for i, s in enumerate(sorted_sessions):
+                display_name = participant_names.get(s.id, f'Участник {s.id}')
+                results.append({
+                    'id': s.id,
+                    'participant_name': display_name,
+                    'score': scores[s.id],
+                    'total_questions': session.quiz.questions.count(),
+                    'rank': i + 1
+                })
 
-        results = []
-        for i, s in enumerate(sorted_sessions):
-            display_name = participant_names.get(s.id, f'Участник {s.id}')
-            results.append({
-                'id': s.id,
-                'participant_name': display_name,
-                'score': scores[s.id],
-                'total_questions': session.quiz.questions.count(),
-                'rank': i + 1
-            })
-
-        return Response(results)
+            return Response(results)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def questions_stats(self, request, pk=None):
@@ -214,23 +239,25 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        questions = session.quiz.questions.all()
+        try:
+            questions = session.quiz.questions.all()
+            stats = []
+            for q in questions:
+                answers = ParticipantAnswer.objects.filter(session=session, question=q)
+                total = answers.count()
+                correct = answers.filter(is_correct=True).count()
 
-        stats = []
-        for q in questions:
-            answers = ParticipantAnswer.objects.filter(session=session, question=q)
-            total = answers.count()
-            correct = answers.filter(is_correct=True).count()
+                stats.append({
+                    'question_id': q.id,
+                    'question_text': q.text,
+                    'total_answers': total,
+                    'correct_count': correct,
+                    'correct_percent': round(correct / total * 100, 1) if total > 0 else 0
+                })
 
-            stats.append({
-                'question_id': q.id,
-                'question_text': q.text,
-                'total_answers': total,
-                'correct_count': correct,
-                'correct_percent': round(correct / total * 100, 1) if total > 0 else 0
-            })
-
-        return Response(stats)
+            return Response(stats)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -248,25 +275,28 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'quiz_title': session.quiz.title
             })
 
-        quiz = session.quiz
-        question_index = int(request.GET.get('index', 0))
-        questions_list = list(quiz.questions.all())
+        try:
+            quiz = session.quiz
+            question_index = int(request.GET.get('index', 0))
+            questions_list = list(quiz.questions.all())
 
-        if question_index >= len(questions_list):
-            session.status = 'completed'
-            session.ended_at = timezone.now()
-            session.save()
-            return Response({'finished': True})
+            if question_index >= len(questions_list):
+                session.status = 'completed'
+                session.ended_at = timezone.now()
+                session.save()
+                return Response({'finished': True})
 
-        current_question = questions_list[question_index]
+            current_question = questions_list[question_index]
 
-        return Response({
-            'id': current_question.id,
-            'text': current_question.text,
-            'timer': 30,
-            'index': question_index,
-            'answers': [
-                {'id': ans.id, 'text': ans.text}
-                for ans in current_question.answer_options.all()
-            ]
-        })
+            return Response({
+                'id': current_question.id,
+                'text': current_question.text,
+                'timer': 30,
+                'index': question_index,
+                'answers': [
+                    {'id': ans.id, 'text': ans.text}
+                    for ans in current_question.answer_options.all()
+                ]
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
