@@ -174,22 +174,17 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
-            return Response({'leaderboard': []})
+            return Response([])
 
         try:
+            # Берём абсолютно все связанные сессии по коду комнаты
             all_sessions = QuizSession.objects.filter(code=session.code)
-
-            if session.participant_name:
-                current_name = session.participant_name
-            elif request.user.is_authenticated:
-                current_name = request.user.username
-            else:
-                current_name = "Организатор"
 
             leaderboard = []
             for s in all_sessions:
                 score = ParticipantAnswer.objects.filter(session=s, is_correct=True).count()
 
+                # Присваиваем валидное имя участника
                 if s.participant_name:
                     name = s.participant_name
                 elif s.quiz.created_by:
@@ -202,34 +197,22 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                     'score': score
                 })
 
+            # Сортируем участников по убыванию баллов
             leaderboard.sort(key=lambda x: x['score'], reverse=True)
 
             formatted_leaderboard = []
-            current_player_rank = 1
             for index, item in enumerate(leaderboard):
                 formatted_leaderboard.append({
                     'position': index + 1,
                     'name': item['name'],
+                    'participant_name': item['name'],  # Дублируем для совместимости свойств
                     'score': item['score']
                 })
-                if item['name'] == current_name:
-                    current_player_rank = index + 1
 
-            current_score = ParticipantAnswer.objects.filter(session=session, is_correct=True).count()
-            total_questions = session.quiz.questions.count()
-
-            return Response({
-                'id': session.id,
-                'participant_name': current_name,
-                'name': current_name,
-                'score': current_score,
-                'correct_answers': current_score,
-                'total_questions': total_questions,
-                'rank': current_player_rank,
-                'leaderboard': formatted_leaderboard
-            })
+            # СТРОГО возвращаем массив, чтобы .map() на фронтенде никогда не падал в фиолетовый экран
+            return Response(formatted_leaderboard)
         except Exception:
-            return Response({'leaderboard': []})
+            return Response([])
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def questions_stats(self, request, pk=None):
