@@ -2,9 +2,8 @@ import logging
 import logging.config
 import logging.handlers
 from pathlib import Path
-from django.conf import settings
 
-LOG_DIR = Path(settings.BASE_DIR) / 'logs'
+LOG_DIR = Path(__file__).resolve().parent.parent / 'logs'
 LOG_DIR.mkdir(exist_ok=True)
 
 LOG_FORMAT = '[%(asctime)s] %(levelname)s %(name)s (%(filename)s:%(lineno)d): %(message)s'
