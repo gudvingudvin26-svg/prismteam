@@ -3,6 +3,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from .redis_utils import get_timer_manager
+from .observer import game_observer
 
 
 class QuizConsumer(AsyncWebsocketConsumer):
@@ -18,6 +19,25 @@ class QuizConsumer(AsyncWebsocketConsumer):
         )
         await self.accept()
 
+        # Подписываемся на игровые события через Observer
+        self._on_question_started = lambda **kwargs: self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'question_started_event',
+                'question_number': kwargs.get('question_number'),
+                'timer': kwargs.get('timer'),
+            }
+        )
+        self._on_game_finished = lambda **kwargs: self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'game_finished_event',
+                'message': 'Игра завершена!',
+            }
+        )
+        game_observer.subscribe('question_started', self._on_question_started)
+        game_observer.subscribe('game_finished', self._on_game_finished)
+
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -28,6 +48,9 @@ class QuizConsumer(AsyncWebsocketConsumer):
         )
 
     async def disconnect(self, code):
+        game_observer.unsubscribe('question_started', self._on_question_started)
+        game_observer.unsubscribe('game_finished', self._on_game_finished)
+
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -147,6 +170,9 @@ class QuizConsumer(AsyncWebsocketConsumer):
         duration = await self._get_quiz_timer_duration()
         self.timer_manager.start_question_timer(self.quiz_id, question_number=next_num, duration=duration)
 
+        # Оповещаем Observer о начале нового вопроса
+        game_observer.notify('question_started', question_number=next_num, timer=duration)
+
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -222,6 +248,7 @@ class QuizConsumer(AsyncWebsocketConsumer):
             for name, score in sorted_scores[:10]
         ]
 
+    # Существующие обработчики событий
     async def user_joined(self, event):
         await self.send(text_data=json.dumps({
             'type': 'user_joined',
@@ -261,5 +288,19 @@ class QuizConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
             'username': event['username'],
+            'message': event['message']
+        }))
+
+    # Новые обработчики для Observer
+    async def question_started_event(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'question_started',
+            'question_number': event['question_number'],
+            'timer': event.get('timer')
+        }))
+
+    async def game_finished_event(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'game_finished',
             'message': event['message']
         }))

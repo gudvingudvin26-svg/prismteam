@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import QuizSession, ParticipantAnswer
 from .serializers import QuizSessionSerializer
+from app_modules.quiz.observer import game_observer
 
 quiz_log = logging.getLogger('quiz_log')
 
@@ -103,6 +104,8 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session.status = 'completed'
             session.ended_at = timezone.now()
             session.save()
+            game_observer.notify('game_finished', session_id=session.id, code=session.code)
+
             return Response({'status': 'completed'})
         except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)

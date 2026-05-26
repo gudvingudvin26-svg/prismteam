@@ -8,9 +8,20 @@ Project patterns
         * QuizRepository – получение квизов пользователя с оптимизацией запросов, публикация.
         * QuestionRepository – получение вопросов пользователя.
         * AnswerOptionRepository – получение вариантов ответов пользователя.
-   - Используется в: QuizViewSet, QuestionViewSet, AnswerOptionViewSet (вместо прямых запросов к ORM).
+   - Используется в: QuizViewSet, QuestionViewSet, AnswerOptionViewSet.
 
 2. Factory (Фабрика)
    - Расположение: app_modules/quiz/factories.py
-   - Класс: QuizFactory – фабричный метод create_quiz(data, user) для создания объекта Quiz с валидацией через сериализатор.
-   - Используется в: QuizViewSet.perform_create (создание квиза через фабрику).
+   - Класс: QuizFactory – фабричный метод create_quiz(data, user) для создания объекта Quiz.
+   - Используется в: QuizViewSet.perform_create.
+
+3. Observer (Наблюдатель)
+   - Расположение: app_modules/quiz/observer.py
+   - Класс: GameObserver – управляет подпиской и оповещением о событиях игры.
+   - События:
+        * question_started – вызывается при переходе к следующему вопросу.
+        * game_finished – вызывается при завершении игровой сессии.
+   - Подписчики:
+        * WebSocket‑комнаты (рассылка сообщений участникам).
+        * Логгер (запись в журнал).
+   - Используется в: QuizConsumer, QuizSessionViewSet.
