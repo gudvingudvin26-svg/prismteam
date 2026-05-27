@@ -1,36 +1,81 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button, Input, Card } from '../../components/ui';
-import { quizzesApi } from '../../api';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Button, Input, Card } from '../components/ui';
+import { quizzesApi } from '../api';
 
 interface AnswerForm {
+  id?: number;
   text: string;
   is_correct: boolean;
 }
 
 interface QuestionForm {
+  id?: number;
   text: string;
   timer?: number;
   points?: number;
+  order: number;
   question_type: string;
   answers: AnswerForm[];
 }
 
-const CreateQuiz: React.FC = () => {
+const EditQuiz: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [globalTimer, setGlobalTimer] = useState<number | undefined>(undefined);
   const [globalPoints, setGlobalPoints] = useState<number>(100);
-  const [questions, setQuestions] = useState<QuestionForm[]>([
-    { text: '', points: 100, question_type: 'single', answers: [{ text: '', is_correct: false }, { text: '', is_correct: false }] }
-  ]);
+  const [questions, setQuestions] = useState<QuestionForm[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [createdQuizId, setCreatedQuizId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchQuiz = async () => {
+      if (!id) return;
+      try {
+        const response = await quizzesApi.getQuiz(parseInt(id));
+        const quizData = response.data;
+        setTitle(quizData.title);
+        setDescription(quizData.description || '');
+        setGlobalTimer(quizData.timer);
+        setGlobalPoints(quizData.points_per_question || 100);
+
+        if (quizData.questions && Array.isArray(quizData.questions)) {
+          const sortedQuestions = [...quizData.questions].sort((a, b) => a.order - b.order);
+          setQuestions(sortedQuestions.map((q: any) => ({
+            id: q.id,
+            text: q.text,
+            timer: q.timer,
+            points: q.points,
+            order: q.order,
+            question_type: q.question_type || 'single',
+            answers: q.answer_options.map((a: any) => ({
+              id: a.id,
+              text: a.text,
+              is_correct: a.is_correct,
+            })),
+          })));
+        }
+      } catch (err) {
+        console.error(err);
+        setError('Ошибка загрузки квиза');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchQuiz();
+  }, [id]);
 
   const addQuestion = () => {
-    setQuestions([...questions, { text: '', points: globalPoints, question_type: 'single', answers: [{ text: '', is_correct: false }, { text: '', is_correct: false }] }]);
+    setQuestions([...questions, {
+      text: '',
+      points: globalPoints,
+      order: questions.length + 1,
+      question_type: 'single',
+      answers: [{ text: '', is_correct: false }, { text: '', is_correct: false }]
+    }]);
   };
 
   const removeQuestion = (index: number) => {
@@ -40,7 +85,7 @@ const CreateQuiz: React.FC = () => {
     }
     const newQuestions = [...questions];
     newQuestions.splice(index, 1);
-    setQuestions(newQuestions);
+    setQuestions(newQuestions.map((q, idx) => ({ ...q, order: idx + 1 })));
     setError('');
   };
 
@@ -48,7 +93,7 @@ const CreateQuiz: React.FC = () => {
     if (index > 0) {
       const newQuestions = [...questions];
       [newQuestions[index - 1], newQuestions[index]] = [newQuestions[index], newQuestions[index - 1]];
-      setQuestions(newQuestions);
+      setQuestions(newQuestions.map((q, idx) => ({ ...q, order: idx + 1 })));
     }
   };
 
@@ -56,7 +101,7 @@ const CreateQuiz: React.FC = () => {
     if (index < questions.length - 1) {
       const newQuestions = [...questions];
       [newQuestions[index], newQuestions[index + 1]] = [newQuestions[index + 1], newQuestions[index]];
-      setQuestions(newQuestions);
+      setQuestions(newQuestions.map((q, idx) => ({ ...q, order: idx + 1 })));
     }
   };
 
@@ -158,68 +203,55 @@ const CreateQuiz: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!validate()) return;
-    setLoading(true);
-    setCreatedQuizId(null);
+    if (!validate() || !id) return;
+    setSaving(true);
     setError('');
 
     try {
-      const quizRes = await quizzesApi.createQuiz({
+      await quizzesApi.updateQuiz(parseInt(id), {
         title,
         description,
         timer: globalTimer,
         points_per_question: globalPoints,
       });
-      const newQuizId = quizRes.data.id;
-      setCreatedQuizId(newQuizId);
 
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
-        if (newQuizId) {
-          await quizzesApi.createQuestion(newQuizId, {
-            text: q.text,
-            order: i + 1,
-            timer: q.timer,
-            points: q.points || globalPoints,
-            question_type: q.question_type,
-            answer_options: q.answers.map(a => ({ text: a.text, is_correct: a.is_correct })),
-          });
+        const questionData = {
+          text: q.text,
+          order: i + 1,
+          timer: q.timer,
+          points: q.points || globalPoints,
+          question_type: q.question_type,
+          answer_options: q.answers.map(a => ({ text: a.text, is_correct: a.is_correct })),
+        };
+
+        if (q.id) {
+          await quizzesApi.updateQuestion(q.id, questionData);
+        } else {
+          await quizzesApi.createQuestion(parseInt(id), questionData);
         }
       }
+
       navigate('/quizzes');
     } catch (err: any) {
-      console.error('Full error:', err);
-
-      if (createdQuizId) {
-        try {
-          await quizzesApi.deleteQuiz(createdQuizId);
-        } catch (deleteErr) {
-          console.error('Failed to delete quiz:', deleteErr);
-        }
-      }
-
-      const status = err.response?.status;
-      if (status === 401) {
-        setError('Сессия истекла. Войдите снова');
-        navigate('/login');
-      } else if (status === 403) {
-        setError('У вас нет прав на создание квиза');
-      } else if (err.response) {
-        setError(`Ошибка: ${JSON.stringify(err.response.data)}`);
-      } else {
-        setError('Ошибка при создании квиза. Попробуйте позже.');
-      }
+      console.error('Save error:', err);
+      setError('Ошибка при сохранении квиза');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-white">Загрузка...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-xl p-6">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Создание нового квиза</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Редактирование квиза</h1>
             <Button variant="outline" onClick={() => navigate(-1)} className="!text-black bg-white hover:bg-gray-100">
               Назад
             </Button>
@@ -345,7 +377,7 @@ const CreateQuiz: React.FC = () => {
 
           <div className="flex gap-4 mt-4">
             <Button variant="outline" onClick={addQuestion}>+ Добавить вопрос</Button>
-            <Button variant="primary" onClick={handleSubmit} isLoading={loading}>Сохранить квиз</Button>
+            <Button variant="primary" onClick={handleSubmit} isLoading={saving}>Сохранить изменения</Button>
           </div>
 
           {error && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
@@ -355,4 +387,4 @@ const CreateQuiz: React.FC = () => {
   );
 };
 
-export default CreateQuiz;
+export default EditQuiz;

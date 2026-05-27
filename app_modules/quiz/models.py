@@ -60,12 +60,18 @@ class Quiz(models.Model):
         verbose_name="Токен доступа"
     )
     timer = models.IntegerField(blank=True, null=True, verbose_name="Таймер в секундах")
+    points_per_question = models.IntegerField(default=100, verbose_name="Баллов за правильный ответ")
 
     def __str__(self):
         return self.title
 
 
 class Question(models.Model):
+    QUESTION_TYPE_CHOICES = [
+        ('single', 'Одиночный выбор'),
+        ('multiple', 'Множественный выбор'),
+    ]
+
     quiz = models.ForeignKey(
         Quiz,
         on_delete=models.CASCADE,
@@ -79,6 +85,14 @@ class Question(models.Model):
         null=False
     )
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    question_type = models.CharField(
+        max_length=10,
+        choices=QUESTION_TYPE_CHOICES,
+        default='single',
+        verbose_name="Тип вопроса"
+    )
+    timer = models.IntegerField(blank=True, null=True, verbose_name="Таймер на вопрос в секундах")
+    points = models.IntegerField(default=100, verbose_name="Баллов за правильный ответ")
 
     class Meta:
         ordering = ['quiz', 'order']

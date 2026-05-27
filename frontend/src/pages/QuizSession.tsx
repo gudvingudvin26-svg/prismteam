@@ -1,140 +1,177 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Card } from '../components/ui';
 import { sessionsApi } from '../api';
 
-interface Answer {
-  id: number;
-  text: string;
-}
-
-interface QuestionData {
+interface Question {
   id: number;
   text: string;
   timer: number;
   index: number;
-  finished?: boolean;
-  answers: Answer[];
+  question_type: string;
+  answers: { id: number; text: string }[];
 }
 
 const QuizSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const [question, setQuestion] = useState<QuestionData | null>(null);
-  const [answered, setAnswered] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [error, setError] = useState('');
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [showTransition, setShowTransition] = useState(false);
-
-  const fetchCurrentQuestion = async () => {
-    if (!sessionId) return;
-    setShowTransition(true);
-    try {
-      const res = await sessionsApi.getCurrentQuestion(Number(sessionId), questionIndex);
-      if (res.data.finished) {
-        navigate(`/results/${sessionId}`);
-        return;
-      }
-      setTimeout(() => {
-        setQuestion(res.data);
-        if (res.data.timer) setTimeLeft(res.data.timer);
-        setAnswered(false);
-        setShowTransition(false);
-      }, 300);
-    } catch (err) {
-      console.error('Error fetching question:', err);
-      setError('Не удалось загрузить вопрос');
-      setShowTransition(false);
-    }
-  };
+  const [question, setQuestion] = useState<Question | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
+  const [isAnswered, setIsAnswered] = useState(false);
 
   useEffect(() => {
-    fetchCurrentQuestion();
-  }, [sessionId, questionIndex]);
+    console.log('QuizSession mounted, sessionId:', sessionId);
+    loadQuestion(0);
+  }, [sessionId]);
 
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0 || answered) return;
+    if (!question || isAnswered) return;
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
+        if (prev <= 1) {
           clearInterval(timer);
-          if (!answered) handleTimeout();
+          handleSubmitAnswer();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
+
     return () => clearInterval(timer);
-  }, [timeLeft, answered]);
+  }, [question, isAnswered]);
 
-  const handleTimeout = async () => {
-    if (answered) return;
-    setAnswered(true);
+  const loadQuestion = async (index: number) => {
+    setLoading(true);
+    setSelectedAnswers([]);
+    setIsAnswered(false);
+    setTimeLeft(30);
+
     try {
-      await sessionsApi.submitAnswer(Number(sessionId), question!.id, -1);
-      setQuestionIndex(prev => prev + 1);
-    } catch (err) {
-      setError('Ошибка при отправке ответа');
+      console.log(`Loading question index ${index} for session ${sessionId}`);
+      const response = await sessionsApi.getCurrentQuestion(parseInt(sessionId!), index);
+
+      if (response.data.finished) {
+        console.log('Quiz finished, redirecting to results page');
+        navigate(`/results/${sessionId}`);
+        return;
+      }
+
+      console.log('Question loaded:', response.data);
+      setQuestion(response.data);
+      setTimeLeft(response.data.timer || 30);
+    } catch (error) {
+      console.error('Error fetching question:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAnswer = async (answerId: number) => {
-    if (answered) return;
-    setAnswered(true);
-    try {
-      await sessionsApi.submitAnswer(Number(sessionId), question!.id, answerId);
-      setQuestionIndex(prev => prev + 1);
-    } catch (err) {
-      setError('Ошибка при отправке ответа');
+  const toggleAnswer = (answerId: number) => {
+    if (isAnswered) return;
+
+    if (question?.question_type === 'multiple') {
+      setSelectedAnswers(prev =>
+        prev.includes(answerId)
+          ? prev.filter(id => id !== answerId)
+          : [...prev, answerId]
+      );
+    } else {
+      setSelectedAnswers([answerId]);
     }
   };
 
-  if (error) return <div className="text-red-600 text-center mt-10">{error}</div>;
+  const handleSubmitAnswer = async () => {
+    if (isAnswered) return;
+    if (selectedAnswers.length === 0) {
+      return;
+    }
 
-  if (showTransition) {
+    setIsAnswered(true);
+
+    try {
+      console.log('Submitting answer for question:', question?.id);
+      if (question?.question_type === 'multiple') {
+        await sessionsApi.submitMultipleAnswers(parseInt(sessionId!), question!.id, selectedAnswers);
+      } else {
+        await sessionsApi.submitAnswer(parseInt(sessionId!), question!.id, selectedAnswers[0]);
+      }
+
+      setTimeout(() => {
+        loadQuestion(question!.index + 1);
+      }, 500);
+    } catch (error) {
+      console.error('Error submitting answer:', error);
+      setIsAnswered(false);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-white border-opacity-50 mx-auto mb-4"></div>
-          <p className="text-white text-lg animate-pulse">Загрузка следующего вопроса...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
+        <div className="text-white text-xl">Загрузка вопроса...</div>
       </div>
     );
   }
 
-  if (!question) return null;
+  if (!question) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
+        <Card className="p-8 text-center">
+          <p className="text-gray-700 mb-4">Вопрос не найден</p>
+          <Button onClick={() => navigate('/')}>На главную</Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 flex items-center justify-center p-4">
-      <Card className="max-w-2xl w-full p-8 bg-white/90 backdrop-blur-sm animate-fadeIn">
-        {timeLeft !== null && (
-          <div className={`text-right text-2xl font-mono mb-4 transition-all duration-300 ${timeLeft <= 5 ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}>
-            {timeLeft} сек
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
+      <div className="max-w-3xl mx-auto">
+        <Card className="p-8 bg-white/90 backdrop-blur-sm">
+          <div className="mb-6 flex justify-between items-center">
+            <span className="text-gray-500">Вопрос {question.index + 1}</span>
+            <span className="text-2xl font-bold text-purple-600">⏱ {timeLeft} сек</span>
           </div>
-        )}
-        <h2 className="text-2xl font-bold mb-6 text-gray-900">{question.text}</h2>
-        <div className="space-y-3">
-          {question.answers.map((answer, idx) => (
+
+          <h2 className="text-2xl font-bold mb-8 text-gray-900">{question.text}</h2>
+
+          <div className="space-y-3">
+            {question.answers.map((answer) => (
+              <button
+                key={answer.id}
+                onClick={() => toggleAnswer(answer.id)}
+                disabled={isAnswered}
+                className={`w-full text-left p-4 rounded-lg border transition ${
+                  selectedAnswers.includes(answer.id)
+                    ? 'bg-purple-100 border-purple-500'
+                    : 'bg-white border-gray-300 hover:bg-purple-50'
+                } ${isAnswered ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+              >
+                {answer.text}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-8">
             <Button
-              key={answer.id}
-              variant="outline"
+              onClick={handleSubmitAnswer}
+              disabled={isAnswered || selectedAnswers.length === 0}
               fullWidth
-              onClick={() => handleAnswer(answer.id)}
-              disabled={answered}
-              className={`transform transition-all duration-200 hover:scale-105 ${answered ? 'opacity-50' : ''}`}
-              style={{ animationDelay: `${idx * 50}ms` }}
             >
-              {answer.text}
+              {selectedAnswers.length === 0 ? 'Выберите ответ' : 'Ответить'}
             </Button>
-          ))}
-        </div>
-        {answered && (
-          <div className="mt-4 text-center text-gray-500 animate-pulse">
-            Ответ принят, загружаем следующий вопрос...
           </div>
-        )}
-      </Card>
+
+          {question.question_type === 'multiple' && (
+            <p className="mt-4 text-sm text-gray-500 text-center">
+              Выбрано вариантов: {selectedAnswers.length}
+            </p>
+          )}
+        </Card>
+      </div>
     </div>
   );
 };

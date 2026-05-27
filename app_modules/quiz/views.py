@@ -16,8 +16,6 @@ from config import settings
 from .models import User, Quiz, Question, AnswerOption
 from .serializers import UserSerializer, QuizSerializer, QuestionSerializer, AnswerOptionSerializer
 from .validators import validate_quiz_integrity
-from .repositories import QuizRepository, QuestionRepository, AnswerOptionRepository
-from .factories import QuizFactory
 
 login_log = logging.getLogger('login_log')
 user = None
@@ -104,7 +102,8 @@ class UserLogin(APIView):
         password = request.data.get('password')
 
         if not identification_parameter or not password:
-            return Response({'error': 'Identification parameter and password required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Identification parameter and password required'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if identification_parameter.isdigit():
             user = User.objects.filter(phone=identification_parameter).first()
@@ -115,7 +114,8 @@ class UserLogin(APIView):
 
         if not user:
             login_log.error(f'Login failed: User with {identification_parameter} does not exist')
-            return Response({'error': 'User with this username/email/phone does not exist'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'User with this username/email/phone does not exist'},
+                            status=status.HTTP_404_NOT_FOUND)
         else:
             if user.check_password(password):
                 refresh = RefreshToken.for_user(user)
@@ -185,6 +185,12 @@ class UserRegistrationAPI(APIView):
         if len(password) < 6:
             return Response({'error': 'Password must be at least 6 characters'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if User.objects.filter(email=email).exists():
+            return Response({'email': 'User with this email already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(username=username).exists():
+            return Response({'username': 'User with this username already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
         user = serializer.save()
         user.first_name = first_name
         user.set_password(password)
@@ -236,27 +242,20 @@ class UserLoginAPI(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class GetCurrentUserAPI(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-        return Response({
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'first_name': user.first_name,
-            'last_name': user.last_name
-        }, status=status.HTTP_200_OK)
-
-
 class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
-    quiz_repo = QuizRepository()
 
     def get_queryset(self):
-        return self.quiz_repo.get_all_for_user(self.request.user)
+        user = self.request.user
+        return Quiz.objects.filter(
+            created_by=user
+        ).prefetch_related(
+            Prefetch(
+                'questions',
+                queryset=Question.objects.select_related('quiz').prefetch_related('answer_options')
+            )
+        ).select_related('created_by').order_by('-id')
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -274,34 +273,97 @@ class QuizViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+    def destroy(self, request, *args, **kwargs):
+        try:
+            quiz = self.get_object()
+            if quiz.created_by != request.user:
+                return Response(
+                    {"detail": "У вас нет прав на удаление этого квиза"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            quiz.delete()
+            return Response(
+                {"detail": "Квиз успешно удален"},
+                status=status.HTTP_204_NO_CONTENT
+            )
+        except Quiz.DoesNotExist:
+            return Response(
+                {"detail": "Квиз не найден"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def publish(self, request, pk=None):
         quiz = self.get_object()
         try:
-            self.quiz_repo.publish(quiz)
+            validate_quiz_integrity(quiz, use_drf_exception=True)
             return Response({"status": "Квиз успешно прошел валидацию и готов к публикации."},
                             status=status.HTTP_200_OK)
         except ValidationError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
-        quiz = QuizFactory.create_quiz(serializer.validated_data, self.request.user)
-        serializer.instance = quiz
+        serializer.save(created_by=self.request.user)
 
 
 class QuestionViewSet(viewsets.ModelViewSet):
     serializer_class = QuestionSerializer
     permission_classes = [permissions.IsAuthenticated]
-    question_repo = QuestionRepository()
 
     def get_queryset(self):
-        return self.question_repo.get_all_for_user(self.request.user)
+        user = self.request.user
+        return Question.objects.filter(
+            quiz__created_by=user
+        ).select_related('quiz').prefetch_related('answer_options')
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        data = {
+            'text': request.data.get('text', instance.text),
+            'order': request.data.get('order', instance.order),
+            'timer': request.data.get('timer', instance.timer),
+            'points': request.data.get('points', instance.points),
+            'question_type': request.data.get('question_type', instance.question_type),
+            'quiz': instance.quiz.id,
+            'answer_options': []
+        }
+
+        for answer in instance.answer_options.all():
+            data['answer_options'].append({
+                'id': answer.id,
+                'text': answer.text,
+                'is_correct': answer.is_correct
+            })
+
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
 
 
 class AnswerOptionViewSet(viewsets.ModelViewSet):
     serializer_class = AnswerOptionSerializer
     permission_classes = [permissions.IsAuthenticated]
-    answer_repo = AnswerOptionRepository()
 
     def get_queryset(self):
-        return self.answer_repo.get_all_for_user(self.request.user)
+        user = self.request.user
+        return AnswerOption.objects.filter(
+            question__quiz__created_by=user
+        ).select_related('question__quiz')
+
+
+class GetCurrentUserAPI(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name
+        }, status=status.HTTP_200_OK)

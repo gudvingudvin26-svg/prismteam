@@ -13,13 +13,14 @@ const QuizSession = lazy(() => import('./pages/QuizSession'));
 const Results = lazy(() => import('./pages/Results'));
 const QuizList = lazy(() => import('./pages/organizer/QuizList'));
 const CreateQuiz = lazy(() => import('./pages/organizer/CreateQuiz'));
+const EditQuiz = lazy(() => import('./pages/EditQuiz'));
 const Stats = lazy(() => import('./pages/Stats'));
 const AccessDenied = lazy(() => import('./pages/AccessDenied'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
-    <div className="text-white text-xl animate-pulse-fast">Загрузка...</div>
+    <div className="text-white text-xl">Загрузка...</div>
   </div>
 );
 
@@ -92,12 +93,12 @@ function App() {
               path="/quizzes/:id/edit"
               element={
                 <PrivateRoute>
-                  <CreateQuiz />
+                  <EditQuiz />
                 </PrivateRoute>
               }
             />
             <Route
-              path="/stats/:sessionId"
+              path="/stats"
               element={
                 <PrivateRoute>
                   <Stats />

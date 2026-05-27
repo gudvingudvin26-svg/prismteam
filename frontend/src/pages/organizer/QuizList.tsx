@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Card, Modal } from '../../components/ui';
-import { quizzesApi, sessionsApi } from '../../api';
+import { quizzesApi, sessionsApi, authApi } from '../../api';
 import { Quiz } from '../../types';
 import { useAppStore } from '../../store/appStore';
 
 const QuizList: React.FC = () => {
   const navigate = useNavigate();
   const user = useAppStore((state) => state.user);
+  const setUser = useAppStore((state) => state.setUser);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,6 +59,10 @@ const QuizList: React.FC = () => {
     }
   };
 
+  const handleEdit = (id: number) => {
+    navigate(`/quizzes/${id}/edit`);
+  };
+
   const handleRun = async (quizId: number) => {
     const participantName = user?.first_name || user?.username || 'Участник';
 
@@ -82,6 +87,12 @@ const QuizList: React.FC = () => {
       }
       console.error(err);
     }
+  };
+
+  const handleLogout = () => {
+    authApi.logout();
+    setUser(null);
+    navigate('/login');
   };
 
   const closeModal = () => {
@@ -109,9 +120,19 @@ const QuizList: React.FC = () => {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-white">Мои квизы</h1>
-          <Link to="/quizzes/create">
-            <Button variant="primary" className="!text-black bg-white hover:bg-gray-100">Создать новый квиз</Button>
-          </Link>
+          <div className="flex gap-4">
+            <Link to="/dashboard">
+              <Button variant="outline" className="!text-black bg-white hover:bg-gray-100">
+                Панель управления
+              </Button>
+            </Link>
+            <Link to="/quizzes/create">
+              <Button variant="primary" className="!text-black bg-white hover:bg-gray-100">Создать новый квиз</Button>
+            </Link>
+            <Button variant="danger" onClick={handleLogout} className="!text-black bg-white hover:bg-gray-100">
+              Выйти
+            </Button>
+          </div>
         </div>
 
         {quizzes.length === 0 ? (
@@ -129,9 +150,9 @@ const QuizList: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="primary" onClick={() => quiz.id && handleRun(quiz.id)}>Запустить</Button>
-                  <Button size="sm" variant="outline" onClick={() => quiz.id && navigate(`/quizzes/${quiz.id}/edit`)}>Редактировать</Button>
+                  <Button size="sm" variant="outline" onClick={() => quiz.id && handleEdit(quiz.id)}>Редактировать</Button>
                   <Button size="sm" variant="danger" onClick={() => quiz.id && handleDelete(quiz.id)}>Удалить</Button>
-                  <Button size="sm" variant="outline" onClick={() => quiz.id && navigate(`/stats/${quiz.id}`)}>Статистика</Button>
+                  <Button size="sm" variant="outline" onClick={() => navigate('/stats')}>Статистика</Button>
                 </div>
               </Card>
             ))}

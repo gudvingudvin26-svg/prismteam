@@ -16,6 +16,9 @@ export const sessionsApi = {
   getSession: (sessionId: number) =>
     api.get(`/api/organizer/sessions/${sessionId}/`),
 
+  getSessionsForQuiz: (quizId: number) =>
+    api.get(`/api/organizer/sessions/?quiz=${quizId}`),
+
   getCurrentQuestion: (sessionId: number, index: number = 0) =>
     api.get(`/api/organizer/sessions/${sessionId}/?index=${index}`),
 
@@ -23,6 +26,12 @@ export const sessionsApi = {
     api.post(`/api/organizer/sessions/${sessionId}/answer/`, {
       question_id: questionId,
       answer_id: answerId
+    }),
+
+  submitMultipleAnswers: (sessionId: number, questionId: number, answerIds: number[]) =>
+    api.post(`/api/organizer/sessions/${sessionId}/answer/`, {
+      question_id: questionId,
+      answer_ids: answerIds
     }),
 
   getMyResult: (sessionId: number) =>

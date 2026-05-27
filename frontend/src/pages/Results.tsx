@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, Button } from '../components/ui';
 import { sessionsApi } from '../api';
+import { useAppStore } from '../store/appStore';
 
 interface MyResult {
   score: number;
@@ -27,24 +28,23 @@ interface QuestionStat {
 
 const Results: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const user = useAppStore((state) => state.user);
   const [myResult, setMyResult] = useState<MyResult | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [questionsStats, setQuestionsStats] = useState<QuestionStat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     const fetchResults = async () => {
       if (!sessionId) return;
       try {
-        const [myRes, leaderRes, statsRes] = await Promise.all([
+        const [myRes, leaderRes, statsRes, sessionRes] = await Promise.all([
           sessionsApi.getMyResult(Number(sessionId)),
           sessionsApi.getResults(Number(sessionId)),
           sessionsApi.getQuestionsStats(Number(sessionId)),
+          sessionsApi.getSession(Number(sessionId)),
         ]);
-
-        console.log('My result:', myRes.data);
-        console.log('Leaderboard:', leaderRes.data);
-        console.log('Questions stats:', statsRes.data);
 
         setMyResult(myRes.data);
 
@@ -59,6 +59,10 @@ const Results: React.FC = () => {
         } else {
           setQuestionsStats([]);
         }
+
+        if (sessionRes.data && user && sessionRes.data.quiz?.created_by?.id === user.id) {
+          setIsOwner(true);
+        }
       } catch (error) {
         console.error(error);
       } finally {
@@ -66,14 +70,21 @@ const Results: React.FC = () => {
       }
     };
     fetchResults();
-  }, [sessionId]);
+  }, [sessionId, user]);
 
   if (loading) return <div className="flex justify-center items-center h-screen text-white">Загрузка результатов...</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
       <div className="max-w-4xl mx-auto bg-white/90 backdrop-blur-sm rounded-lg shadow-xl p-6">
-        <h1 className="text-2xl font-bold mb-6 text-gray-900">Результаты</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Результаты</h1>
+          {isOwner && (
+            <Link to="/dashboard">
+              <Button variant="primary">Панель управления</Button>
+            </Link>
+          )}
+        </div>
 
         {myResult && (
           <Card className="p-6 mb-8 text-center bg-blue-50">
@@ -133,11 +144,11 @@ const Results: React.FC = () => {
         </div>
 
         <div className="mt-8 flex gap-4 justify-center">
+          <Link to="/join">
+            <Button variant="outline">Играть снова</Button>
+          </Link>
           <Link to="/">
             <Button variant="outline">На главную</Button>
-          </Link>
-          <Link to="/join">
-            <Button variant="primary">Играть снова</Button>
           </Link>
         </div>
       </div>

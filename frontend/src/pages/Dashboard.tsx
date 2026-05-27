@@ -76,6 +76,7 @@ const Dashboard: React.FC = () => {
             <Link to="/dashboard" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Обзор</Link>
             <Link to="/quizzes" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Квизы</Link>
             <Link to="/quizzes/create" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Создать</Link>
+            <Link to="/stats" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Статистика</Link>
             <Link to="/join" className="block px-4 py-2 rounded hover:bg-white/20 text-white">Присоединиться</Link>
           </nav>
         </aside>
@@ -114,9 +115,14 @@ const Dashboard: React.FC = () => {
                       <h3 className="font-semibold text-gray-900">{quiz.title}</h3>
                       <p className="text-sm text-gray-500">Создан: {new Date(quiz.created_at || Date.now()).toLocaleDateString()}</p>
                     </div>
-                    <Link to={`/quizzes/${quiz.id}/edit`}>
-                      <Button variant="outline" size="sm">Редактировать</Button>
-                    </Link>
+                    <div className="flex gap-2">
+                      <Link to={`/quizzes/${quiz.id}/edit`}>
+                        <Button variant="outline" size="sm">Редактировать</Button>
+                      </Link>
+                      <Link to="/stats">
+                        <Button variant="outline" size="sm">Статистика</Button>
+                      </Link>
+                    </div>
                   </Card>
                 ))}
               </div>
