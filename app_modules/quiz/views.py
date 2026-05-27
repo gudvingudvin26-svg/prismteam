@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 
-import jwt
+from .factories import QuizFactory
 from django.contrib.auth import logout, login
 from django.db.models import Prefetch
 from django.shortcuts import render, redirect
@@ -303,7 +303,11 @@ class QuizViewSet(viewsets.ModelViewSet):
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        quiz = QuizFactory.create_quiz(
+            serializer.validated_data,
+            self.request.user
+        )
+        serializer.instance = quiz
 
 
 class QuestionViewSet(viewsets.ModelViewSet):
