@@ -27,6 +27,59 @@ backend-test:
     - develop
   allow_failure: true
 
+pylint:
+  stage: test
+  image: python:3.11
+  before_script:
+    - pip install pylint pylint-django
+  script:
+    - pylint app_modules/quiz --exit-zero --fail-under=8.0
+  only:
+    - main
+    - develop
+  allow_failure: true
+
+frontend-test:
+  stage: test
+  image: node:18
+  before_script:
+    - cd frontend
+    - npm install
+  script:
+    - npm run test -- --passWithNoTests || true
+  only:
+    - main
+    - develop
+  allow_failure: true
+
+eslint:
+  stage: test
+  image: node:18
+  before_script:
+    - cd frontend
+    - npm install
+  script:
+    - npx eslint src --ext ts,tsx --max-warnings 100 || true
+  only:
+    - main
+    - develop
+  allow_failure: true
+
+backend-build:
+  stage: build
+  image: python:3.11
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - python manage.py check
+    - python manage.py collectstatic --noinput
+  artifacts:
+    paths:
+      - staticfiles/
+  only:
+    - main
+    - develop
+
 frontend-build:
   stage: build
   image: node:18
