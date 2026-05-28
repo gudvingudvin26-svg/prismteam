@@ -318,26 +318,15 @@ class QuestionViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
+
         instance = self.get_object()
 
-        data = {
-            'text': request.data.get('text', instance.text),
-            'order': request.data.get('order', instance.order),
-            'timer': request.data.get('timer', instance.timer),
-            'points': request.data.get('points', instance.points),
-            'question_type': request.data.get('question_type', instance.question_type),
-            'quiz': instance.quiz.id,
-            'answer_options': []
-        }
+        serializer = self.get_serializer(
+            instance,
+            data=request.data,
+            partial=partial
+        )
 
-        for answer in instance.answer_options.all():
-            data['answer_options'].append({
-                'id': answer.id,
-                'text': answer.text,
-                'is_correct': answer.is_correct
-            })
-
-        serializer = self.get_serializer(instance, data=data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 

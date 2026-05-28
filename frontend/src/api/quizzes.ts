@@ -18,8 +18,8 @@ export const quizzesApi = {
   createQuestion: (quizId: number, data: { text: string; order: number; timer?: number; points?: number; question_type?: string; answer_options: { text: string; is_correct: boolean }[] }) =>
     api.post(`/api/organizer/questions/`, { ...data, quiz: quizId }),
 
-  updateQuestion: (questionId: number, data: { text?: string; order?: number; timer?: number; points?: number; question_type?: string; answer_options?: { text: string; is_correct: boolean }[] }) =>
-    api.put(`/api/organizer/questions/${questionId}/`, data),
+  updateQuestion: (questionId: number, data) =>
+    api.patch(`/api/organizer/questions/${questionId}/`, data),
 
   deleteQuestion: (questionId: number) => api.delete(`/api/organizer/questions/${questionId}/`),
 

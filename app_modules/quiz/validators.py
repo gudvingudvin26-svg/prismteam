@@ -182,7 +182,7 @@ def validate_quiz_integrity(
     """
     ExceptionClass = _get_exception_class(use_drf_exception)
 
-    if quiz.timer is None or quiz.timer <= 0:
+    if quiz.timer is not None and quiz.timer <= 0:
         raise ExceptionClass(
             "Квиз должен иметь корректный лимит времени (значение должно быть больше 0)."
         )
@@ -262,10 +262,12 @@ def validate_quiz_integrity(
                     f"правильный ответ (сейчас: {correct_count})."
                 )
 
+
         elif question.question_type == 'multiple':
             if correct_count < 2:
                 raise ExceptionClass(
                     f"В вопросе '{question_text[:30]}' "
-                    f"для множественного выбора должен быть хотя бы "
-                    f"один правильный ответ (сейчас: {correct_count})."
+                    f"для множественного выбора должно быть минимум "
+                    f"2 правильных ответа (сейчас: {correct_count})."
+
                 )
