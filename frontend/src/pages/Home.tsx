@@ -1,37 +1,67 @@
-/**
- * @fileoverview Главная страница с фиолетово-синим градиентом, тремя карточками преимуществ и белыми кнопками.
- */
-
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Button, Card } from '../components/ui';
+import { Link, useNavigate } from 'react-router-dom';
+import { Card, Button } from '../components/ui';
+import { useAppStore } from '../store/appStore';
+import { authApi } from '../api';
 
 const Home: React.FC = () => {
+  const navigate = useNavigate();
+  const user = useAppStore((state) => state.user);
+  const setUser = useAppStore((state) => state.setUser);
+  const isAuthenticated = !!user;
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+    setUser(null);
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white/10 backdrop-blur-md py-4 px-6 flex justify-between items-center border-b border-white/20">
-        <Link to="/" className="text-2xl font-bold text-white drop-shadow-md">
+      <header className="sticky top-0 z-10 bg-white/10 backdrop-blur-md py-4 px-6 flex flex-wrap justify-between items-center gap-4 border-b border-white/20">
+        <Link to="/" className="text-2xl font-bold text-white drop-shadow-md whitespace-nowrap">
           Only Quizes Fans
         </Link>
-        <div className="space-x-4">
-          <Link to="/login">
-            <Button variant="outline" size="sm" className="!text-black bg-white border-white hover:bg-gray-100">
-              Войти
-            </Button>
-          </Link>
-          <Link to="/register">
-            <Button variant="primary" size="sm" className="!text-black bg-white hover:bg-gray-100 shadow-lg">
-              Регистрация
-            </Button>
-          </Link>
+        <div className="flex gap-3 flex-wrap">
+          {isAuthenticated ? (
+            <>
+              <Link to="/dashboard">
+                <Button variant="outline" size="md">
+                  📊 Панель управления
+                </Button>
+              </Link>
+              <Button
+                variant="danger"
+                size="md"
+                onClick={handleLogout}
+              >
+                🚪 Выйти
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link to="/login">
+                <Button variant="outline" size="md">
+                  Войти
+                </Button>
+              </Link>
+              <Link to="/register">
+                <Button variant="outline" size="md">
+                  Регистрация
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
-      {/* Hero секция */}
       <section className="flex-1 flex items-center justify-center py-20 px-6 text-center">
         <div className="max-w-4xl mx-auto text-white">
-          <h1 className="text-5xl md:text-7xl font-extrabold mb-4 drop-shadow-lg">
+          <h1 className="text-4xl md:text-6xl font-extrabold mb-4 drop-shadow-lg">
             Создавайте и проводите <br />
             <span className="bg-gradient-to-r from-yellow-300 to-pink-400 bg-clip-text text-transparent">
               квизы онлайн
@@ -40,14 +70,14 @@ const Home: React.FC = () => {
           <p className="text-xl md:text-2xl mb-8 max-w-2xl mx-auto text-purple-100">
             Простой способ устроить викторину для друзей, учеников или коллег
           </p>
-          <div className="space-x-4">
-            <Link to="/quizzes/create">
-              <Button variant="primary" size="lg" className="!text-black bg-white hover:bg-gray-100 shadow-lg">
+          <div className="flex gap-4 justify-center flex-wrap">
+            <Link to={isAuthenticated ? "/quizzes/create" : "/register"}>
+              <Button variant="outline" size="lg">
                 Создать квиз
               </Button>
             </Link>
             <Link to="/join">
-              <Button variant="outline" size="lg" className="!text-black bg-white border-white hover:bg-gray-100">
+              <Button variant="outline" size="lg">
                 Присоединиться
               </Button>
             </Link>
@@ -55,7 +85,6 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Преимущества — три карточки */}
       <section className="py-20 px-6 bg-black/20">
         <div className="container mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center text-white mb-12">
@@ -75,29 +104,23 @@ const Home: React.FC = () => {
             <Card className="text-center p-6 bg-white/90 backdrop-blur-sm border border-purple-200 shadow-xl transition-transform hover:scale-105">
               <div className="text-5xl mb-4">🎯</div>
               <h3 className="text-xl font-semibold mb-2 text-purple-800">Любые темы</h3>
-              <p className="text-gray-700">Создавайте квизы на любые темы: от истории до поп-культуры. Вдохновляйте и обучайте!</p>
+              <p className="text-gray-700">Создавайте квизы на любые темы: от истории до поп-культуры</p>
             </Card>
-          </div>
-          <div className="mt-8 text-center text-purple-100 text-lg">
-            ✨ Тысячи вопросов, миллионы возможностей. Присоединяйтесь к сообществу создателей квизов! ✨
           </div>
         </div>
       </section>
 
-      {/* CTA секция */}
       <section className="bg-gradient-to-r from-purple-900 to-blue-900 text-white py-16 px-6 text-center rounded-t-3xl">
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Готовы начать?</h2>
           <p className="text-xl mb-6 text-purple-100">Создайте свой первый квиз прямо сейчас и удивите своих друзей</p>
-          <Link to="/quizzes/create">
-            <Button variant="primary" size="lg" className="!text-black bg-white hover:bg-gray-100 shadow-xl">
-              Создать квиз бесплатно
+          <Link to={isAuthenticated ? "/quizzes/create" : "/register"}>
+            <Button variant="outline" size="lg">
+              {isAuthenticated ? "Создать квиз" : "Зарегистрироваться"}
             </Button>
           </Link>
         </div>
       </section>
-
-      {/* Footer удалён полностью */}
     </div>
   );
 };

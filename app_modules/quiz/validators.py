@@ -11,6 +11,7 @@ def validate_answer_options_data(options_data, use_drf_exception=True, text_fiel
     if not options_data or len(options_data) < 2:
         raise ExceptionClass("Вопрос должен содержать минимум 2 варианта ответа.")
 
+    answer_texts = set()
     for index, opt in enumerate(options_data):
         if not isinstance(opt, dict):
             raise ExceptionClass(f"Вариант ответа #{index + 1} должен быть словарём.")
@@ -25,6 +26,11 @@ def validate_answer_options_data(options_data, use_drf_exception=True, text_fiel
 
         if len(option_text.strip()) < min_length:
             raise ExceptionClass(f"Текст варианта ответа #{index + 1} слишком короткий (минимум {min_length} символ).")
+
+        normalized_text = option_text.strip().lower()
+        if normalized_text in answer_texts:
+            raise ExceptionClass(f"Вариант ответа #{index + 1} дублируется: '{option_text}'")
+        answer_texts.add(normalized_text)
 
 
 def validate_quiz_integrity(quiz, use_drf_exception=True):
@@ -46,11 +52,31 @@ def validate_quiz_integrity(quiz, use_drf_exception=True):
         if len(answers) < 2:
             raise ExceptionClass(f"Вопрос '{question.text[:30]}' должен содержать минимум 2 варианта ответа.")
 
+        answer_texts = set()
+        for answer in answers:
+            normalized = answer.text.strip().lower()
+            if normalized in answer_texts:
+                raise ExceptionClass(f"В вопросе '{question.text[:30]}' обнаружен дубликат ответа: '{answer.text}'")
+            answer_texts.add(normalized)
+
         correct_count = sum(1 for a in answers if a.is_correct)
 
         if question.question_type == 'single':
             if correct_count != 1:
-                raise ExceptionClass(f"В вопросе '{question.text[:30]}' для одиночного выбора должен быть ровно один правильный ответ (сейчас: {correct_count}).")
+                raise ExceptionClass(
+                    f"В вопросе '{question.text[:30]}' для одиночного выбора должен быть ровно один правильный ответ (сейчас: {correct_count}).")
         elif question.question_type == 'multiple':
             if correct_count < 1:
-                raise ExceptionClass(f"В вопросе '{question.text[:30]}' для множественного выбора должен быть хотя бы один правильный ответ (сейчас: {correct_count}).")
+                raise ExceptionClass(
+                    f"В вопросе '{question.text[:30]}' для множественного выбора должен быть хотя бы один правильный ответ (сейчас: {correct_count}).")
+            if correct_count == len(answers):
+                raise ExceptionClass(
+                    f"В вопросе '{question.text[:30]}' нельзя отмечать ВСЕ варианты как правильные для множественного выбора.")
+
+
+def validate_unique_answers_per_question(question):
+    answers = question.answer_options.all()
+    texts = [a.text.strip().lower() for a in answers]
+    duplicates = [text for text in texts if texts.count(text) > 1]
+    if duplicates:
+        raise DjangoValidationError(f"В вопросе обнаружены дублирующиеся ответы: {set(duplicates)}")

@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Card, Modal } from '../../components/ui';
-import { quizzesApi, sessionsApi, authApi } from '../../api';
+import { quizzesApi, sessionsApi } from '../../api';
 import { Quiz } from '../../types';
 import { useAppStore } from '../../store/appStore';
 
 const QuizList: React.FC = () => {
   const navigate = useNavigate();
   const user = useAppStore((state) => state.user);
-  const setUser = useAppStore((state) => state.setUser);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,7 +41,7 @@ const QuizList: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('Удалить квиз? Все связанные сессии и ответы будут удалены.')) {
+    if (window.confirm('Удалить квиз? Все связанные сессии и ответы будут удалены.')) {
       try {
         await quizzesApi.deleteQuiz(id);
         await loadQuizzes();
@@ -89,12 +88,6 @@ const QuizList: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    authApi.logout();
-    setUser(null);
-    navigate('/login');
-  };
-
   const closeModal = () => {
     setModalOpen(false);
     setSessionCode('');
@@ -118,19 +111,14 @@ const QuizList: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <h1 className="text-2xl font-bold text-white">Мои квизы</h1>
-          <div className="flex gap-4">
-            <Link to="/dashboard">
-              <Button variant="outline" className="!text-black bg-white hover:bg-gray-100">
-                Панель управления
-              </Button>
-            </Link>
-            <Link to="/quizzes/create">
-              <Button variant="primary" className="!text-black bg-white hover:bg-gray-100">Создать новый квиз</Button>
-            </Link>
-            <Button variant="danger" onClick={handleLogout} className="!text-black bg-white hover:bg-gray-100">
-              Выйти
+          <div className="flex gap-3 flex-wrap">
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              📊 Панель управления
+            </Button>
+            <Button variant="primary" onClick={() => navigate('/quizzes/create')}>
+              ➕ Создать новый квиз
             </Button>
           </div>
         </div>
@@ -149,10 +137,15 @@ const QuizList: React.FC = () => {
                   Создан: {new Date(quiz.created_at || Date.now()).toLocaleDateString()}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="primary" onClick={() => quiz.id && handleRun(quiz.id)}>Запустить</Button>
-                  <Button size="sm" variant="outline" onClick={() => quiz.id && handleEdit(quiz.id)}>Редактировать</Button>
-                  <Button size="sm" variant="danger" onClick={() => quiz.id && handleDelete(quiz.id)}>Удалить</Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate('/stats')}>Статистика</Button>
+                  <Button size="sm" variant="success" onClick={() => quiz.id && handleRun(quiz.id)}>
+                    ▶ Запустить
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => quiz.id && handleEdit(quiz.id)}>
+                    ✏ Редактировать
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => quiz.id && handleDelete(quiz.id)}>
+                    🗑 Удалить
+                  </Button>
                 </div>
               </Card>
             ))}
@@ -164,8 +157,12 @@ const QuizList: React.FC = () => {
           <p className="text-3xl font-bold text-center text-blue-600 mb-6">{sessionCode}</p>
           <p className="text-sm text-gray-500">Сообщите код участникам, чтобы они могли присоединиться.</p>
           <div className="mt-6 flex justify-end gap-2">
-            <Button variant="outline" onClick={closeModal}>Закрыть</Button>
-            <Button variant="primary" onClick={() => selectedSessionId && navigate(`/play/${selectedSessionId}`)}>Начать игру</Button>
+            <Button variant="outline" onClick={closeModal}>
+              Закрыть
+            </Button>
+            <Button variant="success" onClick={() => selectedSessionId && navigate(`/play/${selectedSessionId}`)}>
+              Начать игру
+            </Button>
           </div>
         </Modal>
       </div>

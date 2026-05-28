@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timedelta
 
-import jwt
 from django.contrib.auth import logout, login
 from django.db.models import Prefetch
 from django.shortcuts import render, redirect
@@ -10,27 +9,27 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from config import settings
 from .models import User, Quiz, Question, AnswerOption
 from .serializers import UserSerializer, QuizSerializer, QuestionSerializer, AnswerOptionSerializer
 from .validators import validate_quiz_integrity
+from .factories import QuizFactory
+from .authentication import CookieJWTAuthentication
 
 login_log = logging.getLogger('login_log')
-user = None
+quiz_log = logging.getLogger('quiz_log')
 
 
 class UserRegistration(APIView):
+    throttle_classes = [AnonRateThrottle]
+
     def post(self, request):
-        global user
         serializer = UserSerializer(data=request.data)
 
-        print("DATA:", request.data)
-
         if not serializer.is_valid():
-            print("SERIALIZER ERRORS:", serializer.errors)
-
+            login_log.error(f"Ошибка регистрации: {serializer.errors}")
             return Response(
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
@@ -38,134 +37,191 @@ class UserRegistration(APIView):
 
         password = request.data.get('password')
         again_password = request.data.get('again_password')
-        phone = request.data.get('phone')
         username = request.data.get('username')
+        email = request.data.get('email')
 
         if not password:
             return Response(
-                {'error': 'Password required'},
+                {'error': 'Требуется пароль'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if password != again_password:
             return Response(
-                {'error': 'Passwords do not match'},
+                {'error': 'Пароли не совпадают'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not phone or not phone.isdigit():
+        if not username:
             return Response(
-                {'error': 'Phone must contain only numbers'},
+                {'error': 'Требуется имя пользователя'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if len(phone) < 10:
+        if not email:
             return Response(
-                {'error': 'Phone number too short'},
+                {'error': 'Требуется email'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if username.isdigit():
             return Response(
-                {'error': 'Username cannot contain only numbers'},
+                {'error': 'Имя пользователя не может состоять только из цифр'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if '@' in username:
             return Response(
-                {'error': 'Username cannot contain @'},
+                {'error': 'Имя пользователя не может содержать символ @'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user = serializer.save()
+        current_user = serializer.save()
+        current_user.set_password(password)
+        current_user.save()
 
-        user.set_password(password)
-        user.save()
+        refresh = RefreshToken.for_user(current_user)
+        login(request, current_user)
 
-        refresh = RefreshToken.for_user(user)
+        login_log.info(
+            f"Пользователь успешно зарегистрирован: {current_user.username}",
+            extra={'user_id': current_user.id}
+        )
 
-        login(request, user)
-        login_log.info(f'User registered successfully with username {user.username}')
-
-        return render(request, 'main.html')
+        response = redirect('/dashboard')
+        response.set_cookie(
+            'access_token',
+            str(refresh.access_token),
+            httponly=True,
+            secure=False,
+            samesite='Lax',
+            max_age=3600 * 24,
+            path='/'
+        )
+        response.set_cookie(
+            'refresh_token',
+            str(refresh),
+            httponly=True,
+            secure=False,
+            samesite='Lax',
+            max_age=3600 * 24 * 7,
+            path='/'
+        )
+        return response
 
     def get(self, request):
         if request.user.is_authenticated:
-            return render(request, 'main.html')
+            return redirect('/dashboard')
         return render(request, 'registration.html')
 
 
 class UserLogin(APIView):
+    throttle_classes = [AnonRateThrottle]
+
     def post(self, request):
-        global user
         identification_parameter = request.data.get('identification_parameter')
         password = request.data.get('password')
 
         if not identification_parameter or not password:
-            return Response({'error': 'Identification parameter and password required'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Требуется идентификатор и пароль'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        if identification_parameter.isdigit():
-            user = User.objects.filter(phone=identification_parameter).first()
-        elif '@' in identification_parameter:
-            user = User.objects.filter(email=identification_parameter).first()
+        if '@' in identification_parameter:
+            current_user = User.objects.filter(email=identification_parameter).first()
         else:
-            user = User.objects.filter(username=identification_parameter).first()
+            current_user = User.objects.filter(username=identification_parameter).first()
 
-        if not user:
-            login_log.error(f'Login failed: User with {identification_parameter} does not exist')
-            return Response({'error': 'User with this username/email/phone does not exist'},
-                            status=status.HTTP_404_NOT_FOUND)
+        if not current_user:
+            login_log.error(f'Ошибка входа: Пользователь {identification_parameter} не найден')
+            return Response(
+                {'error': 'Пользователь с таким именем или email не существует'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if current_user.check_password(password):
+            refresh = RefreshToken.for_user(current_user)
+            login(request, current_user)
+
+            login_log.info(
+                f"Пользователь вошел: {current_user.username}",
+                extra={'user_id': current_user.id}
+            )
+
+            response = redirect('/dashboard')
+            response.set_cookie(
+                'access_token',
+                str(refresh.access_token),
+                httponly=True,
+                secure=False,
+                samesite='Lax',
+                max_age=3600 * 24,
+                path='/'
+            )
+            response.set_cookie(
+                'refresh_token',
+                str(refresh),
+                httponly=True,
+                secure=False,
+                samesite='Lax',
+                max_age=3600 * 24 * 7,
+                path='/'
+            )
+            return response
         else:
-            if user.check_password(password):
-                refresh = RefreshToken.for_user(user)
-                login(request, user)
-                if request.user.is_authenticated:
-                    login_log.info(f'User logged in with username {user.username} successfully')
-                    return render(request, 'main.html')
-                else:
-                    login_log.error(f'User can not log in for some reason')
-                    return Response('User can not log in for some reason', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            else:
-                login_log.error(f'Login failed: Wrong password for {identification_parameter}')
-                return Response({'error': 'Wrong password'}, status=status.HTTP_401_UNAUTHORIZED)
+            login_log.error(f'Ошибка входа: Неверный пароль для {identification_parameter}')
+            return Response(
+                {'error': 'Неверный пароль'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
     def get(self, request):
         if request.user.is_authenticated:
-            return render(request, 'main.html')
-        else:
-            return render(request, 'login.html')
+            return redirect('/dashboard')
+        return render(request, 'login.html')
 
 
 class Main(APIView):
     def get(self, request):
-        return render(request, 'main.html')
+        if request.user.is_authenticated:
+            return render(request, 'main.html')
+        return redirect('/')
 
 
 class UserLogout(APIView):
     def post(self, request):
-        global user
-        username = user.username
+        username = request.user.username if request.user.is_authenticated else 'Аноним'
+        user_id = request.user.id if request.user.is_authenticated else None
+
         logout(request)
-        if not request.user.is_authenticated:
-            login_log.info(f'User with username {username} logged out successfully')
-            return redirect('http://127.0.0.1:8000/login/')
-        else:
-            login_log.error(f'User with username {username} can not log out for some reason')
-            return redirect('http://127.0.0.1:8000/main/')
+
+        login_log.info(
+            f"Пользователь вышел: {username}",
+            extra={'user_id': user_id}
+        )
+
+        response = redirect('/')
+        response.delete_cookie('access_token', path='/')
+        response.delete_cookie('refresh_token', path='/')
+        return response
 
     def get(self, request):
-        return redirect('http://127.0.0.1:8000/main/')
+        if request.user.is_authenticated:
+            logout(request)
+        response = redirect('/')
+        response.delete_cookie('access_token', path='/')
+        response.delete_cookie('refresh_token', path='/')
+        return response
 
 
 class UserRegistrationAPI(APIView):
-    def post(self, request):
-        print("=== REGISTRATION REQUEST ===")
-        print("Request data:", request.data)
+    throttle_classes = [AnonRateThrottle]
 
+    def post(self, request):
         serializer = UserSerializer(data=request.data)
         if not serializer.is_valid():
-            print("Serializer errors:", serializer.errors)
+            login_log.error(f"Ошибка API регистрации: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         username = request.data.get('username')
@@ -175,77 +231,173 @@ class UserRegistrationAPI(APIView):
         first_name = request.data.get('first_name', '')
 
         if not username:
-            return Response({'error': 'Username required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Требуется имя пользователя'}, status=status.HTTP_400_BAD_REQUEST)
         if not email:
-            return Response({'error': 'Email required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Требуется email'}, status=status.HTTP_400_BAD_REQUEST)
         if not password:
-            return Response({'error': 'Password required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Требуется пароль'}, status=status.HTTP_400_BAD_REQUEST)
         if password != again_password:
-            return Response({'error': 'Passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Пароли не совпадают'}, status=status.HTTP_400_BAD_REQUEST)
         if len(password) < 6:
-            return Response({'error': 'Password must be at least 6 characters'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Пароль должен содержать минимум 6 символов'}, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(email=email).exists():
-            return Response({'email': 'User with this email already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'email': 'Пользователь с таким email уже существует'}, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(username=username).exists():
-            return Response({'username': 'User with this username already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'username': 'Пользователь с таким именем уже существует'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        user = serializer.save()
-        user.first_name = first_name
-        user.set_password(password)
-        user.save()
+        current_user = serializer.save()
+        current_user.first_name = first_name
+        current_user.set_password(password)
+        current_user.save()
 
-        refresh = RefreshToken.for_user(user)
+        refresh = RefreshToken.for_user(current_user)
+        login(request, current_user)
 
-        return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
+        login_log.info(
+            f"API регистрация успешна: {username}",
+            extra={'user_id': current_user.id}
+        )
+
+        response = Response({
             'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name
+                'id': current_user.id,
+                'username': current_user.username,
+                'email': current_user.email,
+                'first_name': current_user.first_name,
+                'last_name': current_user.last_name
             }
         }, status=status.HTTP_201_CREATED)
 
+        response.set_cookie(
+            'access_token',
+            str(refresh.access_token),
+            httponly=True,
+            secure=False,
+            samesite='Lax',
+            max_age=3600 * 24,
+            path='/'
+        )
+        response.set_cookie(
+            'refresh_token',
+            str(refresh),
+            httponly=True,
+            secure=False,
+            samesite='Lax',
+            max_age=3600 * 24 * 7,
+            path='/'
+        )
+
+        return response
+
 
 class UserLoginAPI(APIView):
+    throttle_classes = [AnonRateThrottle]
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
-
         if not email or not password:
-            return Response({'error': 'Email and password required'}, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response(
+                {'error': 'Требуется email и пароль'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         try:
-            user = User.objects.get(email=email)
+            current_user = User.objects.get(email=email)
         except User.DoesNotExist:
-            return Response({'detail': 'Неверный email или пароль'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        if not user.check_password(password):
-            return Response({'detail': 'Неверный email или пароль'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        refresh = RefreshToken.for_user(user)
-
-        return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
+            login_log.error(f"Ошибка API входа: Пользователь {email} не найден")
+            return Response(
+                {'detail': 'Неверный email или пароль'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        if not current_user.check_password(password):
+            login_log.error(f"Ошибка API входа: Неверный пароль для {email}")
+            return Response(
+                {'detail': 'Неверный email или пароль'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        refresh = RefreshToken.for_user(current_user)
+        login(request, current_user)
+        login_log.info(
+            f"API вход успешен: {current_user.username}",
+            extra={'user_id': current_user.id}
+        )
+        response = Response({
             'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name
+                'id': current_user.id,
+                'username': current_user.username,
+                'email': current_user.email,
+                'first_name': current_user.first_name,
+                'last_name': current_user.last_name
             }
         }, status=status.HTTP_200_OK)
+        response.set_cookie(
+            'access_token',
+            str(refresh.access_token),
+            httponly=True,
+            secure=False,
+            samesite='Lax',
+            max_age=3600 * 24,
+            path='/'
+        )
+        response.set_cookie(
+            'refresh_token',
+            str(refresh),
+            httponly=True,
+            secure=False,
+            samesite='Lax',
+            max_age=3600 * 24 * 7,
+            path='/'
+        )
+        return response
+class TokenRefreshAPI(APIView):
+    def post(self, request):
+        refresh_token = request.COOKIES.get('refresh_token')
 
-
+        if not refresh_token:
+            return Response(
+                {'error': 'Требуется refresh токен'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            refresh = RefreshToken(refresh_token)
+            access_token = str(refresh.access_token)
+            response = Response({
+                'access': access_token
+            }, status=status.HTTP_200_OK)
+            response.set_cookie(
+                'access_token',
+                access_token,
+                httponly=True,
+                secure=False,
+                samesite='Lax',
+                max_age=3600 * 24,
+                path='/'
+            )
+            return response
+        except Exception as e:
+            login_log.error(f"Ошибка обновления токена: {e}")
+            return Response(
+                {'error': 'Недействительный refresh токен'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+class GetCurrentUserAPI(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    def get(self, request):
+        user = request.user
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name
+        }, status=status.HTTP_200_OK)
 class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
-
+    throttle_classes = [UserRateThrottle]
     def get_queryset(self):
         user = self.request.user
         return Quiz.objects.filter(
@@ -256,11 +408,14 @@ class QuizViewSet(viewsets.ModelViewSet):
                 queryset=Question.objects.select_related('quiz').prefetch_related('answer_options')
             )
         ).select_related('created_by').order_by('-id')
-
     def retrieve(self, request, *args, **kwargs):
         try:
             quiz = self.get_object()
             if quiz.created_by != request.user:
+                quiz_log.warning(
+                    f"Отказано в доступе к квизу {kwargs.get('pk')} для пользователя {request.user.id}",
+                    extra={'quiz_id': kwargs.get('pk'), 'user_id': request.user.id}
+                )
                 return Response(
                     {"detail": "У вас нет доступа к этому квизу"},
                     status=status.HTTP_403_FORBIDDEN
@@ -272,98 +427,67 @@ class QuizViewSet(viewsets.ModelViewSet):
                 {"detail": "Квиз не найден"},
                 status=status.HTTP_404_NOT_FOUND
             )
-
-    def destroy(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):
         try:
-            quiz = self.get_object()
-            if quiz.created_by != request.user:
-                return Response(
-                    {"detail": "У вас нет прав на удаление этого квиза"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            quiz.delete()
-            return Response(
-                {"detail": "Квиз успешно удален"},
-                status=status.HTTP_204_NO_CONTENT
+            quiz_log.info(
+                f"Создание квиза пользователем {request.user.id}",
+                extra={'user_id': request.user.id}
             )
-        except Quiz.DoesNotExist:
-            return Response(
-                {"detail": "Квиз не найден"},
-                status=status.HTTP_404_NOT_FOUND
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            quiz_log.error(
+                f"Не удалось создать квиз: {str(e)}",
+                extra={'user_id': request.user.id}
             )
-
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    def update(self, request, *args, **kwargs):
+        quiz_log.info(
+            f"Обновление квиза {kwargs.get('pk')}",
+            extra={'quiz_id': kwargs.get('pk'), 'user_id': request.user.id}
+        )
+        return super().update(request, *args, **kwargs)
+    def destroy(self, request, *args, **kwargs):
+        quiz_log.info(
+            f"Удаление квиза {kwargs.get('pk')}",
+            extra={'quiz_id': kwargs.get('pk'), 'user_id': request.user.id}
+        )
+        return super().destroy(request, *args, **kwargs)
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def publish(self, request, pk=None):
         quiz = self.get_object()
         try:
             validate_quiz_integrity(quiz, use_drf_exception=True)
-            return Response({"status": "Квиз успешно прошел валидацию и готов к публикации."},
-                            status=status.HTTP_200_OK)
+            quiz_log.info(
+                f"Квиз {pk} опубликован",
+                extra={'quiz_id': pk, 'user_id': request.user.id}
+            )
+            return Response(
+                {"status": "Квиз успешно прошел валидацию и готов к публикации."},
+                status=status.HTTP_200_OK
+            )
         except ValidationError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-
-
+        quiz = QuizFactory.create_quiz(serializer.validated_data, self.request.user)
+        serializer.instance = quiz
 class QuestionViewSet(viewsets.ModelViewSet):
     serializer_class = QuestionSerializer
     permission_classes = [permissions.IsAuthenticated]
-
+    throttle_classes = [UserRateThrottle]
     def get_queryset(self):
         user = self.request.user
         return Question.objects.filter(
             quiz__created_by=user
         ).select_related('quiz').prefetch_related('answer_options')
-
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-
-        data = {
-            'text': request.data.get('text', instance.text),
-            'order': request.data.get('order', instance.order),
-            'timer': request.data.get('timer', instance.timer),
-            'points': request.data.get('points', instance.points),
-            'question_type': request.data.get('question_type', instance.question_type),
-            'quiz': instance.quiz.id,
-            'answer_options': []
-        }
-
-        for answer in instance.answer_options.all():
-            data['answer_options'].append({
-                'id': answer.id,
-                'text': answer.text,
-                'is_correct': answer.is_correct
-            })
-
-        serializer = self.get_serializer(instance, data=data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-
-        return Response(serializer.data)
-
-
 class AnswerOptionViewSet(viewsets.ModelViewSet):
     serializer_class = AnswerOptionSerializer
     permission_classes = [permissions.IsAuthenticated]
-
+    throttle_classes = [UserRateThrottle]
     def get_queryset(self):
         user = self.request.user
         return AnswerOption.objects.filter(
             question__quiz__created_by=user
         ).select_related('question__quiz')
-
-
-class GetCurrentUserAPI(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-        return Response({
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'first_name': user.first_name,
-            'last_name': user.last_name
-        }, status=status.HTTP_200_OK)

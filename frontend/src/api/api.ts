@@ -1,88 +1,50 @@
-import axios from 'axios'
-
-declare global {
-  interface Window {
-    _env_: {
-      API_URL?: string
-      VITE_API_URL?: string
-      [key: string]: string | undefined
-    }
-  }
-}
+import axios from 'axios';
 
 const getBaseUrl = () => {
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return 'https://prismteam-backend.onrender.com'
+  if (window.location.hostname.includes('onrender.com')) {
+    return 'https://prismteam-backend.onrender.com';
   }
-  if (typeof process !== 'undefined' && process.env?.VITE_API_URL) {
-    return process.env.VITE_API_URL
-  }
-  if (typeof window !== 'undefined' && window._env_?.VITE_API_URL) {
-    return window._env_.VITE_API_URL
-  }
-  if (typeof window !== 'undefined' && window._env_?.API_URL) {
-    return window._env_.API_URL
-  }
-  return 'http://localhost:8000'
-}
 
-const BASE_URL = getBaseUrl()
+  return '';
+};
+
+const BASE_URL = getBaseUrl();
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true,
-})
-
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
+});
 
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config
+    const originalRequest = error.config;
 
-    if (error.response?.status === 404 && originalRequest.url?.includes('/quizzes/')) {
-      window.location.href = '/not-found'
-    }
-
-    if (error.response?.status === 403 && !originalRequest.url?.includes('/auth/')) {
-      window.location.href = '/access-denied'
-    }
-
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
-      originalRequest._retry = true
-
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/')) {
+      originalRequest._retry = true;
       try {
-        const refreshToken = localStorage.getItem('refreshToken')
-        const response = await axios.post(`${BASE_URL}/api/auth/refresh/`, {
-          refresh: refreshToken
-        })
-
-        localStorage.setItem('accessToken', response.data.access)
-        originalRequest.headers.Authorization = `Bearer ${response.data.access}`
-
-        return api(originalRequest)
-      } catch {
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
-        window.location.href = '/login'
+        await axios.post(`${BASE_URL}/api/auth/refresh/`, {}, { withCredentials: true });
+        return api(originalRequest);
+      } catch (refreshError) {
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+          window.location.href = '/login';
+        }
       }
     }
 
-    return Promise.reject(error)
-  }
-)
+    if (error.response?.status === 404 && !window.location.pathname.includes('/not-found')) {
+      window.location.href = '/not-found';
+    }
+    if (error.response?.status === 403 && !window.location.pathname.includes('/access-denied')) {
+      window.location.href = '/access-denied';
+    }
 
-export default api
+    return Promise.reject(error);
+  }
+);
+
+export default api;

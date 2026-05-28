@@ -30,20 +30,17 @@ function App() {
 
   useEffect(() => {
     const restoreUser = async () => {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        try {
-          const response = await authApi.getCurrentUser();
-          setUser(response.data);
-        } catch (error) {
-          console.error('Ошибка восстановления пользователя:', error);
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-        }
+      try {
+        const response = await authApi.getCurrentUser();
+        console.log('Restored user:', response.data);
+        setUser(response.data);
+      } catch (error) {
+        console.error('Ошибка восстановления пользователя:', error);
+        setUser(null);
+      } finally {
+        setTimeout(() => setIsAppLoading(false), 100);
       }
-      setTimeout(() => setIsAppLoading(false), 100);
     };
-
     restoreUser();
   }, [setUser]);
 

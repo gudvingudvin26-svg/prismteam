@@ -7,83 +7,49 @@ import { useAppStore } from '../store/appStore';
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const setUser = useAppStore((state) => state.setUser);
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const validate = (): boolean => {
-    console.log('=== VALIDATION START ===');
-    console.log('Name:', name);
-    console.log('Email:', email);
-    console.log('Password length:', password.length);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-    if (!name.trim()) {
-      setError('Введите имя');
-      console.log('Validation failed: name empty');
-      return false;
-    }
-    if (!email.trim()) {
-      setError('Введите email');
-      console.log('Validation failed: email empty');
-      return false;
-    }
-    if (!password) {
-      setError('Введите пароль');
-      console.log('Validation failed: password empty');
-      return false;
+    if (password !== confirmPassword) {
+      setError('Пароли не совпадают');
+      return;
     }
     if (password.length < 6) {
       setError('Пароль должен содержать минимум 6 символов');
-      console.log('Validation failed: password too short');
-      return false;
-    }
-    if (password !== confirmPassword) {
-      setError('Пароли не совпадают');
-      console.log('Validation failed: passwords do not match');
-      return false;
-    }
-    setError('');
-    console.log('Validation passed');
-    return true;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('=== FORM SUBMITTED ===');
-    console.log('Name:', name);
-    console.log('Email:', email);
-
-    if (!validate()) {
-      console.log('Validation failed, aborting');
       return;
     }
-    console.log('Validation passed, proceeding to API call');
 
     setLoading(true);
-    try {
-      console.log('Calling authApi.register...');
-      const response = await authApi.register(name, email, password, confirmPassword);
-      console.log('API Response:', response);
-      console.log('Response data:', response.data);
+    setError('');
 
-      const { access, refresh, user } = response.data;
-      authApi.saveTokens(access, refresh);
+    try {
+      const response = await authApi.register(username, email, password, confirmPassword);
+      console.log('Registration response:', response.data);
+
+      const { user } = response.data;
       setUser(user);
-      console.log('Registration successful, navigating to /dashboard');
       navigate('/dashboard');
     } catch (err: any) {
-      console.error('=== ERROR ===');
-      console.error('Error object:', err);
-      console.error('Error response:', err.response);
-      console.error('Error data:', err.response?.data);
-
+      console.error('Registration error:', err);
       const data = err.response?.data;
       if (data && typeof data === 'object') {
-        const firstError = Object.values(data)[0];
-        setError(Array.isArray(firstError) ? firstError[0] : String(firstError));
+        if (data.error) {
+          setError(data.error);
+        } else if (data.email) {
+          setError(Array.isArray(data.email) ? data.email[0] : data.email);
+        } else if (data.username) {
+          setError(Array.isArray(data.username) ? data.username[0] : data.username);
+        } else {
+          const firstError = Object.values(data)[0];
+          setError(Array.isArray(firstError) ? firstError[0] : String(firstError));
+        }
       } else {
         setError('Ошибка регистрации. Попробуйте другой email.');
       }
@@ -101,40 +67,12 @@ const Register: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <Input
-            label="Имя"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <Input
-            label="Пароль"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-          />
-          <Input
-            label="Подтверждение пароля"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
+          <Input label="Имя пользователя" value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Input label="Пароль" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <Input label="Подтверждение пароля" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+          {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">{error}</div>}
 
           <Button type="submit" fullWidth isLoading={loading}>
             Зарегистрироваться
@@ -142,10 +80,7 @@ const Register: React.FC = () => {
         </form>
 
         <p className="mt-6 text-center text-gray-600">
-          Уже есть аккаунт?{' '}
-          <Link to="/login" className="text-purple-600 hover:text-purple-700 font-medium hover:underline">
-            Войти
-          </Link>
+          Уже есть аккаунт? <Link to="/login" className="text-purple-600 hover:underline">Войти</Link>
         </p>
       </Card>
     </div>

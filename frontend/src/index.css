@@ -132,3 +132,31 @@ a {
     background-position: -200% 0;
   }
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-fast {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .whitespace-nowrap {
+    white-space: normal;
+  }
+}

@@ -2,22 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Вход</title>
 </head>
 <body>
 <h1>Вход</h1>
-    <form method = "POST">
+    <form method="POST">
         {% csrf_token %}
         <div>
-            <p>Введите свой username/email/номер телефона (без "+"):</p>
-            <input type="text" name = "identification_parameter">
+            <p>Введите username или email:</p>
+            <input type="text" name="identification_parameter" required>
         </div>
         <div>
             <p>Введите пароль:</p>
-            <input type="password" name = "password">
+            <input type="password" name="password" required>
         </div>
         <div>
-            <input type = "submit">
+            <input type="submit" value="Войти">
         </div>
     </form>
 </body>

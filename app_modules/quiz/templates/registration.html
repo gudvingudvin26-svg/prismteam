@@ -2,32 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Регистрация</title>
 </head>
 <body>
 <h1>Регистрация</h1>
-    <form method = "POST">
+    <form method="POST">
         {% csrf_token %}
         <div>
             <p>Введите свой username:</p>
-            <input type="text" name = "username">
+            <input type="text" name="username" required>
         </div>
         <div>
             <p>Введите свой email:</p>
-            <input type="text" name = "email">
+            <input type="email" name="email" required>
         </div>
         <div>
-            <p>Введите свой номер телефона (необязательно):</p>
-            <label>+ </label>
-            <input type="text" name = "phone">
+            <p>Введите пароль:</p>
+            <input type="password" name="password" required>
         </div>
         <div>
-            <p>Введите и повторите пароль:</p>
-            <input type="password" name = "password">
-            <input type="password" name = "again_password">
+            <p>Повторите пароль:</p>
+            <input type="password" name="again_password" required>
         </div>
         <div>
-            <input type = "submit">
+            <input type="submit" value="Зарегистрироваться">
         </div>
     </form>
 </body>

@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from .models import QuizSession, ParticipantAnswer
 from .serializers import QuizSessionSerializer
 from app_modules.quiz.observer import game_observer

@@ -1,20 +1,18 @@
+import os
 import dj_database_url
 from pathlib import Path
-import os
-from app_modules.quiz.log_filters import InfoOrErrorFilter
+from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-ny+!$q8y65e54a^ekhck7a8^1)!uzqk7z&+t_zbmp8r!lk-g$e'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-your-secret-key-here-change-in-production')
 
-DEBUG = False
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    'prismteam-backend.onrender.com',
-    '*.onrender.com',
-]
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend').split(',')
+
+RENDER_BACKEND_URL = os.environ.get('RENDER_BACKEND_URL', 'https://prismteam-backend.onrender.com')
+RENDER_FRONTEND_URL = os.environ.get('RENDER_FRONTEND_URL', 'https://prismteam-frontend.onrender.com')
 
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
@@ -27,13 +25,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'channels',
+    'channels_redis',
     'app_modules.quiz',
     'app_modules.quiz_sessions',
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -64,16 +63,23 @@ ASGI_APPLICATION = 'config.asgi.application'
 
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer'
-    }
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [os.environ.get('REDIS_URL', 'redis://localhost:6379')],
+        },
+    },
 }
 
-REDIS_HOST = 'localhost'
-REDIS_PORT = 6379
-REDIS_DB = 0
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+REDIS_PORT = int(os.environ.get('REDIS_PORT', 6379))
+REDIS_DB = int(os.environ.get('REDIS_DB', 0))
 
 DATABASES = {
-    'default': dj_database_url.config(default='sqlite:///db.sqlite3')
+    'default': dj_database_url.config(
+        default='postgresql://prismteam_user:prismteam_pass@db:5432/prismteam',
+        conn_max_age=600,
+        ssl_require=False
+    )
 }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -110,7 +116,7 @@ LOGGING = {
     },
     "filters": {
         "info_or_error": {
-            "()": InfoOrErrorFilter,
+            "()": "app_modules.quiz.log_filters.InfoOrErrorFilter",
         }
     },
     "handlers": {
@@ -146,12 +152,12 @@ LOGGING = {
     },
     'loggers': {
         "login_log": {
-            "handlers": ["console"],
+            "handlers": ["console", "app_file"],
             "level": "INFO",
             "propagate": False,
         },
         "quiz_log": {
-            "handlers": ["console"],
+            "handlers": ["console", "app_file"],
             "level": "INFO",
             "propagate": False,
         },
@@ -169,11 +175,8 @@ LOGGING = {
 }
 
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
 STATIC_URL = 'static/'
@@ -181,7 +184,14 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 AUTH_USER_MODEL = 'quiz.User'
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:8000',
+    'http://localhost',
+    'https://prismteam-frontend.onrender.com',
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
@@ -204,10 +214,27 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+
+CORS_EXPOSE_HEADERS = ['content-type', 'set-cookie']
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://prismteam-frontend.onrender.com',
+]
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'app_modules.quiz.authentication.CookieJWTAuthentication',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day',
+    }
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Input, Card } from '../../components/ui';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Card from '../../components/ui/Card';
 import { quizzesApi } from '../../api';
 
 interface AnswerForm {
@@ -8,7 +10,7 @@ interface AnswerForm {
   is_correct: boolean;
 }
 
-interface QuestionForm {
+interface QuestionFormType {
   text: string;
   timer?: number;
   points?: number;
@@ -22,20 +24,25 @@ const CreateQuiz: React.FC = () => {
   const [description, setDescription] = useState('');
   const [globalTimer, setGlobalTimer] = useState<number | undefined>(undefined);
   const [globalPoints, setGlobalPoints] = useState<number>(100);
-  const [questions, setQuestions] = useState<QuestionForm[]>([
+  const [questions, setQuestions] = useState<QuestionFormType[]>([
+    { text: '', points: 100, question_type: 'single', answers: [{ text: '', is_correct: false }, { text: '', is_correct: false }] },
     { text: '', points: 100, question_type: 'single', answers: [{ text: '', is_correct: false }, { text: '', is_correct: false }] }
   ]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [createdQuizId, setCreatedQuizId] = useState<number | null>(null);
 
   const addQuestion = () => {
-    setQuestions([...questions, { text: '', points: globalPoints, question_type: 'single', answers: [{ text: '', is_correct: false }, { text: '', is_correct: false }] }]);
+    setQuestions([...questions, {
+      text: '',
+      points: globalPoints,
+      question_type: 'single',
+      answers: [{ text: '', is_correct: false }, { text: '', is_correct: false }]
+    }]);
   };
 
   const removeQuestion = (index: number) => {
-    if (questions.length === 1) {
-      setError('Должен быть хотя бы один вопрос');
+    if (questions.length <= 2) {
+      setError('Должно быть минимум 2 вопроса');
       return;
     }
     const newQuestions = [...questions];
@@ -60,27 +67,17 @@ const CreateQuiz: React.FC = () => {
     }
   };
 
-  const updateQuestionText = (qIndex: number, text: string) => {
+  const updateQuestion = (index: number, field: string, value: any) => {
     const newQuestions = [...questions];
-    newQuestions[qIndex].text = text;
-    setQuestions(newQuestions);
-  };
+    newQuestions[index] = { ...newQuestions[index], [field]: value };
 
-  const updateQuestionTimer = (qIndex: number, timer: number | undefined) => {
-    const newQuestions = [...questions];
-    newQuestions[qIndex].timer = timer;
-    setQuestions(newQuestions);
-  };
+    if (field === 'question_type' && value === 'single') {
+      const hasCorrect = newQuestions[index].answers.some(a => a.is_correct);
+      if (!hasCorrect && newQuestions[index].answers.length > 0) {
+        newQuestions[index].answers[0].is_correct = true;
+      }
+    }
 
-  const updateQuestionPoints = (qIndex: number, points: number) => {
-    const newQuestions = [...questions];
-    newQuestions[qIndex].points = points;
-    setQuestions(newQuestions);
-  };
-
-  const updateQuestionType = (qIndex: number, question_type: string) => {
-    const newQuestions = [...questions];
-    newQuestions[qIndex].question_type = question_type;
     setQuestions(newQuestions);
   };
 
@@ -97,6 +94,14 @@ const CreateQuiz: React.FC = () => {
       return;
     }
     newQuestions[qIndex].answers.splice(aIndex, 1);
+
+    if (newQuestions[qIndex].question_type === 'single') {
+      const hasCorrect = newQuestions[qIndex].answers.some(a => a.is_correct);
+      if (!hasCorrect && newQuestions[qIndex].answers.length > 0) {
+        newQuestions[qIndex].answers[0].is_correct = true;
+      }
+    }
+
     setQuestions(newQuestions);
     setError('');
   };
@@ -121,94 +126,87 @@ const CreateQuiz: React.FC = () => {
     setQuestions(newQuestions);
   };
 
-  const validate = (): boolean => {
+  const validate = (): string | null => {
     if (questions.length < 2) {
-      setError('Добавьте хотя бы два вопроса');
-      return false;
+      return 'Добавьте хотя бы два вопроса';
     }
     if (!title.trim()) {
-      setError('Введите название квиза');
-      return false;
+      return 'Введите название квиза';
     }
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (!q.text.trim()) {
-        setError(`Вопрос ${i + 1}: введите текст вопроса`);
-        return false;
+        return `Вопрос ${i + 1}: введите текст вопроса`;
       }
       if (q.answers.length < 2) {
-        setError(`Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`);
-        return false;
+        return `Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`;
       }
       let hasCorrect = false;
+      const answerTexts = new Set();
       for (let j = 0; j < q.answers.length; j++) {
         if (!q.answers[j].text.trim()) {
-          setError(`Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`);
-          return false;
+          return `Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`;
         }
+        const normalizedText = q.answers[j].text.trim().toLowerCase();
+        if (answerTexts.has(normalizedText)) {
+          return `Вопрос ${i + 1}: вариант "${q.answers[j].text}" повторяется`;
+        }
+        answerTexts.add(normalizedText);
         if (q.answers[j].is_correct) hasCorrect = true;
       }
       if (!hasCorrect) {
-        setError(`Вопрос ${i + 1}: выберите правильный вариант`);
-        return false;
+        return `Вопрос ${i + 1}: выберите правильный вариант`;
+      }
+      if (q.question_type === 'multiple') {
+        const correctCount = q.answers.filter(a => a.is_correct).length;
+        if (correctCount === q.answers.length) {
+          return `Вопрос ${i + 1}: нельзя отмечать ВСЕ варианты как правильные`;
+        }
       }
     }
-    setError('');
-    return true;
+    return null;
   };
 
   const handleSubmit = async () => {
-    if (!validate()) return;
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setLoading(true);
-    setCreatedQuizId(null);
     setError('');
 
     try {
       const quizRes = await quizzesApi.createQuiz({
-        title,
-        description,
-        timer: globalTimer,
+        title: title.trim(),
+        description: description.trim(),
+        timer: globalTimer && globalTimer > 0 ? globalTimer : undefined,
         points_per_question: globalPoints,
       });
+
       const newQuizId = quizRes.data.id;
-      setCreatedQuizId(newQuizId);
 
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
-        if (newQuizId) {
-          await quizzesApi.createQuestion(newQuizId, {
-            text: q.text,
-            order: i + 1,
-            timer: q.timer,
-            points: q.points || globalPoints,
-            question_type: q.question_type,
-            answer_options: q.answers.map(a => ({ text: a.text, is_correct: a.is_correct })),
-          });
-        }
+
+        await quizzesApi.createQuestion(newQuizId, {
+          text: q.text.trim(),
+          order: i + 1,
+          timer: q.timer && q.timer > 0 ? q.timer : undefined,
+          points: q.points || globalPoints,
+          question_type: q.question_type,
+          answer_options: q.answers.map(a => ({
+            text: a.text.trim(),
+            is_correct: a.is_correct
+          })),
+        });
       }
+
       navigate('/quizzes');
     } catch (err: any) {
-      console.error('Full error:', err);
-
-      if (createdQuizId) {
-        try {
-          await quizzesApi.deleteQuiz(createdQuizId);
-        } catch (deleteErr) {
-          console.error('Failed to delete quiz:', deleteErr);
-        }
-      }
-
-      const status = err.response?.status;
-      if (status === 401) {
-        setError('Сессия истекла. Войдите снова');
-        navigate('/login');
-      } else if (status === 403) {
-        setError('У вас нет прав на создание квиза');
-      } else if (err.response) {
-        setError(`Ошибка: ${JSON.stringify(err.response.data)}`);
-      } else {
-        setError('Ошибка при создании квиза. Попробуйте позже.');
-      }
+      console.error('Ошибка при создании:', err);
+      setError(err.response?.data?.detail || err.message || 'Ошибка при создании квиза');
     } finally {
       setLoading(false);
     }
@@ -220,135 +218,143 @@ const CreateQuiz: React.FC = () => {
         <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-xl p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Создание нового квиза</h1>
-            <Button variant="outline" onClick={() => navigate(-1)} className="!text-black bg-white hover:bg-gray-100">
-              Назад
-            </Button>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => navigate(-1)}>← Назад</Button>
+              <Button variant="primary" onClick={handleSubmit} isLoading={loading}>Сохранить квиз</Button>
+            </div>
           </div>
 
           <Card className="p-6 mb-6 bg-white shadow-md">
-            <Input
-              label="Название квиза"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-            <Input
-              label="Описание"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              multiline
-              rows={3}
-            />
+            <Input label="Название квиза" value={title} onChange={(e) => setTitle(e.target.value)} required />
+            <Input label="Описание" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={3} />
             <Input
               label="Таймер на весь квиз (секунды, опционально)"
               type="number"
               value={globalTimer || ''}
-              onChange={(e) => setGlobalTimer(e.target.value ? Number(e.target.value) : undefined)}
+              onChange={(e) => {
+                const value = e.target.value ? Number(e.target.value) : undefined;
+                setGlobalTimer((value !== undefined && value <= 0) ? undefined : value);
+              }}
+              min="1"
+              step="1"
             />
             <Input
               label="Баллов за правильный ответ (по умолчанию)"
               type="number"
               value={globalPoints}
               onChange={(e) => setGlobalPoints(Number(e.target.value))}
+              min="1"
             />
           </Card>
 
-          {questions.map((q, qIdx) => (
-            <Card key={qIdx} className="p-6 mb-6 bg-white shadow-md">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-900">Вопрос {qIdx + 1}</h3>
-                  <div className="flex gap-1 mb-4">
-                    <button
-                      type="button"
-                      onClick={() => moveQuestionUp(qIdx)}
-                      className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
-                      disabled={qIdx === 0}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveQuestionDown(qIdx)}
-                      className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
-                      disabled={qIdx === questions.length - 1}
-                    >
-                      ↓
-                    </button>
+          {questions.map((q, qIdx) => {
+            const questionType = q.question_type;
+            const answers = q.answers;
+            const timer = q.timer;
+            const points = q.points;
+            const text = q.text;
+
+            return (
+              <Card key={qIdx} className="p-6 mb-6 bg-white shadow-md">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-900">Вопрос {qIdx + 1}</h3>
+                    <div className="flex gap-1 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => moveQuestionUp(qIdx)}
+                        className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                        disabled={qIdx === 0}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveQuestionDown(qIdx)}
+                        className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                        disabled={qIdx === questions.length - 1}
+                      >
+                        ↓
+                      </button>
+                    </div>
                   </div>
+                  <Button variant="danger" size="sm" onClick={() => removeQuestion(qIdx)}>Удалить вопрос</Button>
                 </div>
-                <Button variant="danger" size="sm" onClick={() => removeQuestion(qIdx)}>Удалить вопрос</Button>
-              </div>
 
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Тип вопроса
-                </label>
-                <select
-                  value={q.question_type}
-                  onChange={(e) => updateQuestionType(qIdx, e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
-                >
-                  <option value="single">Одиночный выбор</option>
-                  <option value="multiple">Множественный выбор</option>
-                </select>
-              </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Тип вопроса</label>
+                  <select
+                    value={questionType}
+                    onChange={(e) => updateQuestion(qIdx, 'question_type', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
+                  >
+                    <option value="single">Одиночный выбор</option>
+                    <option value="multiple">Множественный выбор</option>
+                  </select>
+                </div>
 
-              <Input
-                label="Текст вопроса"
-                value={q.text}
-                onChange={(e) => updateQuestionText(qIdx, e.target.value)}
-                required
-              />
-
-              <div className="grid grid-cols-2 gap-4">
                 <Input
-                  label="Таймер на вопрос (секунды, опционально)"
-                  type="number"
-                  value={q.timer || ''}
-                  onChange={(e) => updateQuestionTimer(qIdx, e.target.value ? Number(e.target.value) : undefined)}
+                  label="Текст вопроса"
+                  value={text}
+                  onChange={(e) => updateQuestion(qIdx, 'text', e.target.value)}
+                  required
                 />
-                <Input
-                  label="Баллов за вопрос"
-                  type="number"
-                  value={q.points || globalPoints}
-                  onChange={(e) => updateQuestionPoints(qIdx, Number(e.target.value))}
-                />
-              </div>
 
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Варианты ответов {q.question_type === 'multiple' && '(можно выбрать несколько)'}
-                </label>
-                {q.answers.map((ans, aIdx) => (
-                  <div key={aIdx} className="flex items-center gap-2 mb-2">
-                    <input
-                      type={q.question_type === 'multiple' ? 'checkbox' : 'radio'}
-                      name={`correct-${qIdx}`}
-                      checked={ans.is_correct}
-                      onChange={() => setCorrectAnswer(qIdx, aIdx)}
-                      className="h-4 w-4 text-blue-600"
-                    />
-                    <Input
-                      placeholder={`Вариант ${aIdx + 1}`}
-                      value={ans.text}
-                      onChange={(e) => updateAnswerText(qIdx, aIdx, e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button variant="danger" size="sm" onClick={() => removeAnswer(qIdx, aIdx)}>×</Button>
-                  </div>
-                ))}
-                <Button variant="outline" size="sm" onClick={() => addAnswer(qIdx)}>+ Добавить вариант</Button>
-              </div>
-            </Card>
-          ))}
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Таймер на вопрос (секунды, опционально)"
+                    type="number"
+                    value={timer || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? Number(e.target.value) : undefined;
+                      updateQuestion(qIdx, 'timer', (value !== undefined && value <= 0) ? undefined : value);
+                    }}
+                    min="1"
+                    step="1"
+                  />
+                  <Input
+                    label="Баллов за вопрос"
+                    type="number"
+                    value={points || globalPoints}
+                    onChange={(e) => updateQuestion(qIdx, 'points', Number(e.target.value))}
+                    min="1"
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Варианты ответов {questionType === 'multiple' && '(можно выбрать несколько)'}
+                  </label>
+                  {answers.map((ans, aIdx) => (
+                    <div key={aIdx} className="flex items-center gap-2 mb-2">
+                      <input
+                        type={questionType === 'multiple' ? 'checkbox' : 'radio'}
+                        name={`correct-${qIdx}`}
+                        checked={ans.is_correct}
+                        onChange={() => setCorrectAnswer(qIdx, aIdx)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <Input
+                        placeholder={`Вариант ${aIdx + 1}`}
+                        value={ans.text}
+                        onChange={(e) => updateAnswerText(qIdx, aIdx, e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button variant="danger" size="sm" onClick={() => removeAnswer(qIdx, aIdx)}>×</Button>
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={() => addAnswer(qIdx)}>+ Добавить вариант</Button>
+                </div>
+              </Card>
+            );
+          })}
 
           <div className="flex gap-4 mt-4">
             <Button variant="outline" onClick={addQuestion}>+ Добавить вопрос</Button>
             <Button variant="primary" onClick={handleSubmit} isLoading={loading}>Сохранить квиз</Button>
           </div>
 
-          {error && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
+          {error && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded whitespace-pre-wrap">{error}</div>}
         </div>
       </div>
     </div>

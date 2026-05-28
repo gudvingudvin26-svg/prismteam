@@ -23,11 +23,13 @@ const Login: React.FC = () => {
     setError('');
     try {
       const response = await authApi.login(email, password);
-      const { access, refresh, user } = response.data;
-      authApi.saveTokens(access, refresh);
+      console.log('Login response:', response.data);
+
+      const { user } = response.data;
       setUser(user);
       navigate('/dashboard');
     } catch (err: any) {
+      console.error('Login error:', err);
       const status = err.response?.status;
       const data = err.response?.data;
 

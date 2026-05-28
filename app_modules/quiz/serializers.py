@@ -9,7 +9,7 @@ quiz_log = logging.getLogger('quiz_log')
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone', 'password']
+        fields = ['id', 'username', 'email', 'password']
         extra_kwargs = {
             'password': {'write_only': True}
         }
@@ -77,7 +77,7 @@ class QuestionSerializer(serializers.ModelSerializer):
                 AnswerOption(question=instance, **opt) for opt in options_data
             ])
 
-        quiz_log.info(f'Organizer updated question in the quiz successfully')
+        quiz_log.info('Организатор успешно обновил вопрос в квизе')
         return instance
 
 

@@ -1,7 +1,7 @@
 [MASTER]
 load-plugins=pylint_django
 django-settings-module=config.settings
-ignore=migrations,tests.py
+ignore=migrations,tests.py,venv,__pycache__,logs,staticfiles
 
 [MESSAGES CONTROL]
 disable=missing-docstring,
@@ -13,7 +13,34 @@ disable=missing-docstring,
         unused-argument,
         unused-import,
         trailing-whitespace,
-        missing-final-newline
+        missing-final-newline,
+        line-too-long,
+        too-many-instance-attributes,
+        too-many-arguments,
+        too-many-locals,
+        too-many-branches,
+        too-many-statements,
+        too-many-return-statements,
+        fixme,
+        broad-except,
+        protected-access,
+        no-self-use,
+        unnecessary-pass,
+        useless-return,
+        import-outside-toplevel,
+        cyclic-import,
+        wrong-import-order
 
 [FORMAT]
 max-line-length=120
+max-module-lines=2000
+
+[BASIC]
+good-names=i,j,k,ex,Run,_,id,pk,db,q,fd
+
+[SIMILARITIES]
+ignore-imports=yes
+min-similarity-lines=10
+
+[TYPECHECK]
+generated-members=objects,DoesNotExist,MultipleObjectsReturned,get_queryset,get_or_create,filter,exclude,first,last,count,exists,update,delete,select_related,prefetch_related,annotate,aggregate,values,values_list

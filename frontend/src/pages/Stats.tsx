@@ -1,101 +1,137 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, Button } from '../components/ui';
 import { quizzesApi, sessionsApi } from '../api';
-import { useAppStore } from '../store/appStore';
-
-interface UserStats {
-  created_quizzes: number;
-  completed_quizzes: number;
-  total_correct_answers: number;
-  total_points: number;
-  average_score: number;
-}
 
 const Stats: React.FC = () => {
   const navigate = useNavigate();
-  const user = useAppStore((state) => state.user);
-  const [stats, setStats] = useState<UserStats>({
-    created_quizzes: 0,
-    completed_quizzes: 0,
-    total_correct_answers: 0,
-    total_points: 0,
-    average_score: 0,
-  });
+  const location = useLocation();
+  const [quizzes, setQuizzes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [selectedQuiz, setSelectedQuiz] = useState<number | null>(null);
+  const [quizStats, setQuizStats] = useState<any>(null);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [questionsStats, setQuestionsStats] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      setLoading(true);
-      try {
-        const response = await quizzesApi.getMyQuizzes();
-        const userQuizzes = response.data;
+    loadQuizzes();
+  }, []);
 
-        let completedQuizIds = new Set();
-        let totalCorrect = 0;
-        let totalPoints = 0;
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const quizId = params.get('quiz');
+    if (quizId && quizzes.length > 0) {
+      const quiz = quizzes.find(q => q.id === parseInt(quizId));
+      if (quiz) {
+        loadQuizStats(parseInt(quizId));
+      }
+    }
+  }, [quizzes, location.search]);
 
-        for (const quiz of userQuizzes) {
+  const loadQuizzes = async () => {
+    setLoading(true);
+    try {
+      const response = await quizzesApi.getMyQuizzes();
+      setQuizzes(response.data);
+    } catch (error) {
+      console.error('Error loading quizzes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadQuizStats = async (quizId: number) => {
+    setSelectedQuiz(quizId);
+    setLeaderboard([]);
+    setQuestionsStats([]);
+    setQuizStats(null);
+
+    try {
+      const sessionsResponse = await sessionsApi.getSessionsForQuiz(quizId);
+      const sessions = sessionsResponse.data;
+
+      const uniqueParticipants = new Map();
+
+      for (const session of sessions) {
+        if (session.participant_name) {
           try {
-            const sessionsResponse = await sessionsApi.getSessionsForQuiz(quiz.id);
-            const sessions = sessionsResponse.data;
+            const resultsResponse = await sessionsApi.getResults(session.id);
+            const results = resultsResponse.data;
 
-            for (const session of sessions) {
-              if (session.status === 'completed' && session.participant_name && session.participant_name !== '') {
-                completedQuizIds.add(quiz.id);
-
-                try {
-                  const resultsResponse = await sessionsApi.getMyResult(session.id);
-                  const sessionResults = resultsResponse.data;
-
-                  console.log(`Session ${session.id} (player: ${session.participant_name}) results:`, sessionResults);
-
-                  if (sessionResults) {
-                    if (sessionResults.correct_answers) {
-                      totalCorrect += sessionResults.correct_answers;
-                    }
-                    if (sessionResults.score) {
-                      totalPoints += sessionResults.score;
-                    }
-                  }
-                } catch (e) {
-                  console.error('Error fetching session results:', e);
+            if (Array.isArray(results)) {
+              for (const result of results) {
+                const name = result.participant_name || session.participant_name;
+                if (!uniqueParticipants.has(name) || uniqueParticipants.get(name) < result.score) {
+                  uniqueParticipants.set(name, result.score);
                 }
+              }
+            } else if (results && typeof results === 'object') {
+              const name = results.participant_name || session.participant_name;
+              if (!uniqueParticipants.has(name) || uniqueParticipants.get(name) < (results.score || 0)) {
+                uniqueParticipants.set(name, results.score || 0);
               }
             }
           } catch (e) {
-            console.error('Error fetching sessions for quiz:', e);
+            console.error('Error fetching results:', e);
+          }
+        }
+      }
+
+      const completedSessions = sessions.filter((s: any) => s.status === 'completed');
+      const totalScore = Array.from(uniqueParticipants.values()).reduce((sum, score) => sum + score, 0);
+      const averageScore = uniqueParticipants.size > 0 ? Math.round(totalScore / uniqueParticipants.size) : 0;
+
+      setQuizStats({
+        total_sessions: sessions.length,
+        total_participants: uniqueParticipants.size,
+        completed_sessions: completedSessions.length,
+        average_score: averageScore
+      });
+
+      const leaderboardData = Array.from(uniqueParticipants.entries())
+        .map(([name, score]) => ({ participant_name: name, score }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10);
+
+      setLeaderboard(leaderboardData);
+
+      if (completedSessions.length > 0) {
+        const allQuestionsStats: { [key: number]: { text: string; total: number; correct: number } } = {};
+
+        for (const session of completedSessions.slice(0, 5)) {
+          try {
+            const statsResponse = await sessionsApi.getQuestionsStats(session.id);
+            if (Array.isArray(statsResponse.data)) {
+              for (const stat of statsResponse.data) {
+                if (!allQuestionsStats[stat.question_id]) {
+                  allQuestionsStats[stat.question_id] = {
+                    text: stat.question_text,
+                    total: 0,
+                    correct: 0
+                  };
+                }
+                allQuestionsStats[stat.question_id].total += stat.total_answers || 0;
+                allQuestionsStats[stat.question_id].correct += stat.correct_count || 0;
+              }
+            }
+          } catch (e) {
+            console.error('Error fetching stats:', e);
           }
         }
 
-        const averageScore = completedQuizIds.size > 0 ? Math.round(totalPoints / completedQuizIds.size) : 0;
+        const formattedStats = Object.values(allQuestionsStats).map(stat => ({
+          question_text: stat.text,
+          total_answers: stat.total,
+          correct_count: stat.correct,
+          correct_percent: stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0
+        }));
 
-        console.log('Final stats:', {
-          created_quizzes: userQuizzes.length,
-          completed_quizzes: completedQuizIds.size,
-          total_correct_answers: totalCorrect,
-          total_points: totalPoints,
-          average_score: averageScore,
-        });
-
-        setStats({
-          created_quizzes: userQuizzes.length,
-          completed_quizzes: completedQuizIds.size,
-          total_correct_answers: totalCorrect,
-          total_points: totalPoints,
-          average_score: averageScore,
-        });
-      } catch (err: any) {
-        console.error('Error fetching stats:', err);
-        setError('Ошибка загрузки статистики');
-      } finally {
-        setLoading(false);
+        setQuestionsStats(formattedStats);
       }
-    };
-
-    fetchStats();
-  }, []);
+    } catch (error) {
+      console.error('Error loading quiz stats:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -105,69 +141,122 @@ const Stats: React.FC = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
-        <Card className="p-8 text-center max-w-md bg-white/90 backdrop-blur-sm">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Ошибка</h2>
-          <p className="text-gray-700 mb-6">{error}</p>
-          <div className="flex gap-4 justify-center">
-            <Button variant="outline" onClick={() => navigate(-1)}>Назад</Button>
-            <Button onClick={() => navigate('/dashboard')}>В панель управления</Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-white">Статистика игрока</h1>
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+          <h1 className="text-2xl font-bold text-white">Статистика</h1>
           <div className="flex gap-4">
-            <Button variant="outline" onClick={() => navigate(-1)} className="!text-black bg-white hover:bg-gray-100">
-              Назад
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              ← Панель управления
             </Button>
-            <Button variant="outline" onClick={() => navigate('/dashboard')} className="!text-black bg-white hover:bg-gray-100">
-              Панель управления
+            <Button variant="outline" onClick={() => navigate('/quizzes')}>
+              Мои квизы
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-          <Card className="p-4 text-center bg-white/90 backdrop-blur-sm">
-            <p className="text-gray-500 text-sm mb-1">Создано квизов</p>
-            <p className="text-3xl font-bold text-purple-600">{stats.created_quizzes}</p>
+        {quizzes.length === 0 ? (
+          <Card className="p-8 text-center bg-white/90 backdrop-blur-sm">
+            <p className="text-gray-600">У вас пока нет квизов для отображения статистики.</p>
+            <Button variant="primary" className="mt-4" onClick={() => navigate('/quizzes/create')}>
+              Создать квиз
+            </Button>
           </Card>
-          <Card className="p-4 text-center bg-white/90 backdrop-blur-sm">
-            <p className="text-gray-500 text-sm mb-1">Пройдено квизов</p>
-            <p className="text-3xl font-bold text-blue-600">{stats.completed_quizzes}</p>
-          </Card>
-          <Card className="p-4 text-center bg-white/90 backdrop-blur-sm">
-            <p className="text-gray-500 text-sm mb-1">Правильных ответов</p>
-            <p className="text-3xl font-bold text-green-600">{stats.total_correct_answers}</p>
-          </Card>
-          <Card className="p-4 text-center bg-white/90 backdrop-blur-sm">
-            <p className="text-gray-500 text-sm mb-1">Всего баллов</p>
-            <p className="text-3xl font-bold text-orange-600">{stats.total_points}</p>
-          </Card>
-          <Card className="p-4 text-center bg-white/90 backdrop-blur-sm">
-            <p className="text-gray-500 text-sm mb-1">Средний балл</p>
-            <p className="text-3xl font-bold text-red-600">{stats.average_score}</p>
-          </Card>
-        </div>
+        ) : (
+          <>
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              {quizzes.map((quiz) => (
+                <Card
+                  key={quiz.id}
+                  className={`p-5 bg-white/90 backdrop-blur-sm cursor-pointer hover:shadow-lg transition ${
+                    selectedQuiz === quiz.id ? 'ring-2 ring-purple-500' : ''
+                  }`}
+                  onClick={() => loadQuizStats(quiz.id)}
+                >
+                  <h3 className="text-xl font-semibold mb-2 text-gray-900">{quiz.title}</h3>
+                  <p className="text-gray-600 mb-4">{quiz.description || 'Без описания'}</p>
+                  <div className="text-sm text-gray-500">
+                    Создан: {new Date(quiz.created_at || Date.now()).toLocaleDateString()}
+                  </div>
+                </Card>
+              ))}
+            </div>
 
-        <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-xl p-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900">Детализация</h2>
-          <div className="space-y-2 text-gray-700">
-            <p>• Вы создали <span className="font-bold text-purple-600">{stats.created_quizzes}</span> квизов</p>
-            <p>• Вы прошли <span className="font-bold text-blue-600">{stats.completed_quizzes}</span> квизов</p>
-            <p>• Правильных ответов: <span className="font-bold text-green-600">{stats.total_correct_answers}</span></p>
-            <p>• Всего набрано баллов: <span className="font-bold text-orange-600">{stats.total_points}</span></p>
-            <p>• Средний балл за квиз: <span className="font-bold text-red-600">{stats.average_score}</span></p>
-          </div>
-        </div>
+            {selectedQuiz && quizStats && (
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-xl p-6">
+                <h2 className="text-xl font-bold mb-4 text-gray-900">Статистика квиза</h2>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  <Card className="p-4 text-center bg-white shadow-md">
+                    <p className="text-gray-500 text-sm">Всего сессий</p>
+                    <p className="text-2xl font-bold text-blue-600">{quizStats.total_sessions || 0}</p>
+                  </Card>
+                  <Card className="p-4 text-center bg-white shadow-md">
+                    <p className="text-gray-500 text-sm">Участников</p>
+                    <p className="text-2xl font-bold text-green-600">{quizStats.total_participants || 0}</p>
+                  </Card>
+                  <Card className="p-4 text-center bg-white shadow-md">
+                    <p className="text-gray-500 text-sm">Завершено</p>
+                    <p className="text-2xl font-bold text-purple-600">{quizStats.completed_sessions || 0}</p>
+                  </Card>
+                  <Card className="p-4 text-center bg-white shadow-md">
+                    <p className="text-gray-500 text-sm">Средний балл</p>
+                    <p className="text-2xl font-bold text-orange-600">{quizStats.average_score || 0}</p>
+                  </Card>
+                </div>
+
+                {leaderboard.length > 0 && (
+                  <>
+                    <h3 className="text-lg font-semibold mb-4 text-gray-900">Таблица лидеров</h3>
+                    <div className="overflow-x-auto mb-8">
+                      <table className="w-full">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="p-3 text-left">Место</th>
+                            <th className="p-3 text-left">Участник</th>
+                            <th className="p-3 text-left">Баллы</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {leaderboard.map((item, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td className="p-3">{idx + 1}</td>
+                              <td className="p-3">{item.participant_name}</td>
+                              <td className="p-3 font-bold text-blue-600">{item.score}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+
+                {questionsStats.length > 0 && (
+                  <>
+                    <h3 className="text-lg font-semibold mb-4 text-gray-900">Статистика по вопросам</h3>
+                    <div className="space-y-4">
+                      {questionsStats.map((stat, idx) => (
+                        <Card key={idx} className="p-4 bg-white shadow-md">
+                          <p className="font-medium text-gray-900 mb-2">{stat.question_text}</p>
+                          <div className="w-full bg-gray-200 rounded-full h-4">
+                            <div
+                              className="bg-green-500 h-4 rounded-full transition-all duration-500"
+                              style={{ width: `${stat.correct_percent}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-2">
+                            {stat.correct_count} из {stat.total_answers} правильных ({stat.correct_percent}%)
+                          </p>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
