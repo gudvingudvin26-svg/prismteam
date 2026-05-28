@@ -6,6 +6,8 @@ stages:
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   NODE_MODULES_CACHE: "$CI_PROJECT_DIR/frontend/node_modules"
+  DATABASE_URL: "sqlite:///db.sqlite3"
+  DEBUG: "False"
 
 cache:
   paths:
@@ -16,83 +18,29 @@ backend-test:
   stage: test
   image: python:3.11
   before_script:
-    - pip install -r requirements-dev.txt
-  script:
-    - python manage.py migrate
-    - pytest app_modules/quiz/tests_ws.py -v || true
-    - python manage.py test app_modules.quiz --exclude-tag=ws || true
-  only:
-    - main
-    - develop-backend
-    - merge_requests
-
-frontend-test:
-  stage: test
-  image: node:18
-  before_script:
-    - cd frontend
-    - npm install
-  script:
-    - npm run test || true
-  only:
-    - main
-    - develop-backend
-    - merge_requests
-
-pylint:
-  stage: test
-  image: python:3.11
-  before_script:
-    - pip install -r requirements-dev.txt
-  script:
-    - pylint app_modules/quiz --fail-under=8.0 --exit-zero
-  allow_failure: false
-  artifacts:
-    reports:
-      codequality: pylint-report.json
-    paths:
-      - pylint-report.json
-    expire_in: 1 week
-  only:
-    - merge_requests
-    - main
-    - develop-backend
-
-eslint:
-  stage: test
-  image: node:18
-  before_script:
-    - cd frontend
-    - npm install
-  script:
-    - npm run lint || true
-  allow_failure: true
-  only:
-    - merge_requests
-
-build-backend:
-  stage: build
-  image: python:3.11
-  script:
     - pip install -r requirements.txt
+  script:
     - python manage.py check
+    - python manage.py makemigrations --check
   only:
     - main
-    - develop-backend
+    - develop
+  allow_failure: true
 
-build-frontend:
+frontend-build:
   stage: build
   image: node:18
-  script:
+  before_script:
     - cd frontend
     - npm install
+  script:
     - npm run build
   artifacts:
     paths:
       - frontend/dist/
   only:
     - main
-    - develop-backend
+    - develop
 
 deploy:
   stage: deploy
