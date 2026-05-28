@@ -4,7 +4,6 @@ const getBaseUrl = () => {
   if (window.location.hostname.includes('onrender.com')) {
     return 'https://prismteam-backend.onrender.com';
   }
-
   return '';
 };
 

@@ -35,7 +35,8 @@ const Register: React.FC = () => {
 
       const { user } = response.data;
       setUser(user);
-      navigate('/dashboard');
+
+      window.location.href = '/dashboard';
     } catch (err: any) {
       console.error('Registration error:', err);
       const data = err.response?.data;

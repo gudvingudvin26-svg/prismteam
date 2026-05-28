@@ -275,8 +275,8 @@ class UserRegistrationAPI(APIView):
             'access_token',
             str(refresh.access_token),
             httponly=True,
-            secure=False,
-            samesite='Lax',
+            secure=True,
+            samesite='None',
             max_age=3600 * 24,
             path='/'
         )
@@ -284,8 +284,8 @@ class UserRegistrationAPI(APIView):
             'refresh_token',
             str(refresh),
             httponly=True,
-            secure=False,
-            samesite='Lax',
+            secure=True,
+            samesite='None',
             max_age=3600 * 24 * 7,
             path='/'
         )
