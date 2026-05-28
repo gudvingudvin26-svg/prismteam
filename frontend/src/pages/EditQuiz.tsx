@@ -126,8 +126,18 @@ const EditQuiz: React.FC = () => {
   const updateQuestionType = (qIndex: number, question_type: string) => {
     const newQuestions = [...questions];
     newQuestions[qIndex].question_type = question_type;
-    setQuestions(newQuestions);
-  };
+    if (
+      question_type === 'multiple' &&
+      newQuestions[qIndex].answers.length < 3
+    ) {
+      newQuestions[qIndex].answers.push({
+        text: '',
+        is_correct: false,
+      });
+  }
+
+  setQuestions(newQuestions);
+};
 
   const addAnswer = (qIndex: number) => {
     const newQuestions = [...questions];
@@ -137,10 +147,17 @@ const EditQuiz: React.FC = () => {
 
   const removeAnswer = (qIndex: number, aIndex: number) => {
     const newQuestions = [...questions];
-    if (newQuestions[qIndex].answers.length <= 2) {
-      setError('У вопроса должно быть минимум 2 варианта');
+
+    const minAnswers = newQuestions[qIndex].question_type === 'multiple'
+      ? 3
+      : 2;
+
+    if (newQuestions[qIndex].answers.length <= minAnswers) {
+      setError(
+    `У вопроса должно быть минимум ${minAnswers} варианта ответа`);
       return;
     }
+
     newQuestions[qIndex].answers.splice(aIndex, 1);
     setQuestions(newQuestions);
     setError('');
@@ -167,37 +184,109 @@ const EditQuiz: React.FC = () => {
   };
 
   const validate = (): boolean => {
-    if (questions.length < 2) {
-      setError('Добавьте хотя бы два вопроса');
+  if (!title.trim()) {
+    setError('Введите название квиза');
+    return false;
+  }
+
+  if (questions.length < 2) {
+    setError('Квиз должен содержать минимум 2 вопроса');
+    return false;
+  }
+
+  if (globalTimer !== undefined && globalTimer <= 0) {
+    setError('Таймер квиза должен быть больше 0');
+    return false;
+  }
+
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+
+    if (!q.text.trim()) {
+      setError(`Вопрос ${i + 1}: введите текст вопроса`);
       return false;
     }
-    if (!title.trim()) {
-      setError('Введите название квиза');
+
+    if (q.text.trim().length < 5) {
+      setError(`Вопрос ${i + 1}: текст слишком короткий`);
       return false;
     }
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-      if (!q.text.trim()) {
-        setError(`Вопрос ${i + 1}: введите текст вопроса`);
+
+    if (q.timer !== undefined && q.timer <= 0) {
+      setError(`Вопрос ${i + 1}: таймер должен быть больше 0`);
+      return false;
+    }
+
+    if (q.points !== undefined && q.points <= 0) {
+      setError(`Вопрос ${i + 1}: количество баллов должно быть больше 0`);
+      return false;
+    }
+
+    if (q.question_type === 'multiple') {
+      if (q.answers.length < 3) {
+        setError(
+          `Вопрос ${i + 1}: для множественного выбора нужно минимум 3 варианта ответа`
+        );
         return false;
       }
+    } else {
       if (q.answers.length < 2) {
-        setError(`Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`);
-        return false;
-      }
-      let hasCorrect = false;
-      for (let j = 0; j < q.answers.length; j++) {
-        if (!q.answers[j].text.trim()) {
-          setError(`Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`);
-          return false;
-        }
-        if (q.answers[j].is_correct) hasCorrect = true;
-      }
-      if (!hasCorrect) {
-        setError(`Вопрос ${i + 1}: выберите правильный вариант`);
+        setError(
+          `Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`
+        );
         return false;
       }
     }
+
+    let correctCount = 0;
+
+    for (let j = 0; j < q.answers.length; j++) {
+      const answer = q.answers[j];
+
+      if (!answer.text.trim()) {
+        setError(
+          `Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`
+        );
+        return false;
+      }
+
+      if (answer.text.trim().length < 1) {
+        setError(
+          `Вопрос ${i + 1}: вариант ${j + 1} слишком короткий`
+        );
+        return false;
+      }
+
+      if (answer.is_correct) {
+        correctCount++;
+      }
+    }
+
+    if (q.question_type === 'single') {
+      if (correctCount !== 1) {
+        setError(
+          `Вопрос ${i + 1}: для одиночного выбора должен быть ровно один правильный ответ`
+        );
+        return false;
+      }
+    }
+
+    if (q.question_type === 'multiple') {
+      if (correctCount < 2) {
+        setError(
+          `Вопрос ${i + 1}: для множественного выбора должно быть минимум 2 правильных ответа`
+        );
+        return false;
+      }
+
+      if (correctCount === q.answers.length) {
+        setError(
+          `Вопрос ${i + 1}: нельзя отмечать все варианты правильными`
+        );
+        return false;
+      }
+    }
+  }
     setError('');
     return true;
   };

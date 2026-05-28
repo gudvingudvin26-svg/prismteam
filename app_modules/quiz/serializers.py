@@ -33,25 +33,49 @@ class QuestionSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         text = data.get('text')
+
         if text is not None and not text.strip():
-            raise serializers.ValidationError("Текст вопроса не может быть пустым.")
+            raise serializers.ValidationError(
+                "Текст вопроса не может быть пустым."
+            )
 
         options = data.get('answer_options')
-        if options is not None:
-            validate_answer_options_data(options, use_drf_exception=True)
-
         question_type = data.get('question_type')
-        if question_type:
-            if question_type == 'single':
-                correct_count = sum(1 for opt in options if opt.get('is_correct'))
-                if correct_count != 1:
-                    raise serializers.ValidationError(
-                        {"answer_options": "Для одиночного выбора должен быть ровно один правильный ответ"})
-            elif question_type == 'multiple':
-                correct_count = sum(1 for opt in options if opt.get('is_correct'))
-                if correct_count < 1:
-                    raise serializers.ValidationError(
-                        {"answer_options": "Для множественного выбора должен быть хотя бы один правильный ответ"})
+
+        if options is not None:
+            validate_answer_options_data(
+                options,
+                use_drf_exception=True,
+                question_type=question_type,
+            )
+
+        if question_type == 'single':
+            correct_count = sum(
+                1 for opt in options
+                if opt.get('is_correct')
+            )
+
+            if correct_count != 1:
+                raise serializers.ValidationError(
+                    {
+                        "answer_options":
+                            "Для одиночного выбора должен быть ровно один правильный ответ"
+                    }
+                )
+
+        elif question_type == 'multiple':
+            correct_count = sum(
+                1 for opt in options
+                if opt.get('is_correct')
+            )
+
+            if correct_count < 2:
+                raise serializers.ValidationError(
+                    {
+                        "answer_options":
+                            "Для множественного выбора должно быть минимум 2 правильных ответа"
+                    }
+                )
 
         return data
 

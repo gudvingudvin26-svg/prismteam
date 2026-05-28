@@ -329,8 +329,8 @@ const CreateQuiz: React.FC = () => {
     // Questions
     // =========================
 
-    if (questions.length < 1) {
-      setError('Добавьте хотя бы один вопрос');
+    if (questions.length < 2) {
+      setError('Квиз должен содержать минимум 2 вопроса');
       return false;
     }
 
@@ -465,7 +465,7 @@ const CreateQuiz: React.FC = () => {
 
       if (
         question.question_type === 'multiple' &&
-        correctAnswersCount < 1
+        correctAnswersCount < 2
       ) {
         setError(
           `Вопрос ${i + 1}: для множественного выбора нужен хотя бы один правильный ответ`

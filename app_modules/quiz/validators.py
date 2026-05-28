@@ -147,6 +147,22 @@ def validate_answer_options_data(
                 f"Текст варианта ответа #{index} содержит бессмысленный или некорректный текст."
             )
 
+    if question_type:
+        correct_count = sum(
+            1 for opt in options_data
+            if opt.get('is_correct')
+        )
+
+        if question_type == 'single' and correct_count != 1:
+            raise ExceptionClass(
+                "Для одиночного выбора должен быть ровно один правильный ответ."
+            )
+
+        if question_type == 'multiple' and correct_count < 2:
+            raise ExceptionClass(
+                "Для множественного выбора должно быть минимум 2 правильных ответа."
+            )
+
 
 def validate_quiz_integrity(
     quiz,
@@ -166,9 +182,7 @@ def validate_quiz_integrity(
     """
     ExceptionClass = _get_exception_class(use_drf_exception)
 
-    time_limit = getattr(quiz, 'time_limit', None)
-
-    if time_limit is None or time_limit <= 0:
+    if quiz.timer is None or quiz.timer <= 0:
         raise ExceptionClass(
             "Квиз должен иметь корректный лимит времени (значение должно быть больше 0)."
         )
@@ -180,8 +194,8 @@ def validate_quiz_integrity(
         quiz.questions.prefetch_related('answer_options')
     )
 
-    if not questions:
-        raise ExceptionClass("Квиз должен содержать хотя бы один вопрос.")
+    if len(questions) < 2:
+        raise ExceptionClass("Квиз должен содержать минимум 2 вопроса.")
 
     for question in questions:
         question_text = (question.text or "").strip()
@@ -249,7 +263,7 @@ def validate_quiz_integrity(
                 )
 
         elif question.question_type == 'multiple':
-            if correct_count < 1:
+            if correct_count < 2:
                 raise ExceptionClass(
                     f"В вопросе '{question_text[:30]}' "
                     f"для множественного выбора должен быть хотя бы "
