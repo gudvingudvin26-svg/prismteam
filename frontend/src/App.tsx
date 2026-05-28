@@ -29,20 +29,23 @@ function App() {
   const [isAppLoading, setIsAppLoading] = useState(true);
 
   useEffect(() => {
-    const restoreUser = async () => {
-      try {
-        const response = await authApi.getCurrentUser();
-        console.log('Restored user:', response.data);
-        setUser(response.data);
-      } catch (error) {
-        console.error('Ошибка восстановления пользователя:', error);
-        setUser(null);
-      } finally {
-        setTimeout(() => setIsAppLoading(false), 100);
-      }
-    };
-    restoreUser();
-  }, [setUser]);
+  const restoreUser = async () => {
+    if (window.location.pathname === '/logout') {
+      setIsAppLoading(false);
+      return;
+    }
+    try {
+      const response = await authApi.getCurrentUser();
+      setUser(response.data);
+    } catch (error) {
+      console.error('Ошибка восстановления пользователя:', error);
+      setUser(null);
+    } finally {
+      setTimeout(() => setIsAppLoading(false), 100);
+    }
+  };
+  restoreUser();
+}, [setUser]);
 
   if (isAppLoading) {
     return <LoadingSpinner />;

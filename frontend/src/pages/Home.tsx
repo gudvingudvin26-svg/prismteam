@@ -17,7 +17,7 @@ const Home: React.FC = () => {
       console.error('Logout error:', e);
     }
     setUser(null);
-    navigate('/');
+    window.location.href = '/';
   };
 
   return (
@@ -26,7 +26,10 @@ const Home: React.FC = () => {
         <Link to="/" className="text-2xl font-bold text-white drop-shadow-md whitespace-nowrap">
           Only Quizes Fans
         </Link>
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-3 flex-wrap items-center">
+          {isAuthenticated && (
+            <span className="text-white/80 text-sm">👋 {user?.username || user?.email}</span>
+          )}
           {isAuthenticated ? (
             <>
               <Link to="/dashboard">
@@ -34,11 +37,7 @@ const Home: React.FC = () => {
                   📊 Панель управления
                 </Button>
               </Link>
-              <Button
-                variant="danger"
-                size="md"
-                onClick={handleLogout}
-              >
+              <Button variant="danger" size="md" onClick={handleLogout}>
                 🚪 Выйти
               </Button>
             </>
