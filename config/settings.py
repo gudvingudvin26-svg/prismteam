@@ -70,28 +70,13 @@ CHANNEL_LAYERS = {
     },
 }
 
-REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
-REDIS_PORT = int(os.environ.get('REDIS_PORT', 6379))
-REDIS_DB = int(os.environ.get('REDIS_DB', 0))
-
-# Database configuration
-IS_DOCKER = os.environ.get('DOCKER_ENV', 'False') == 'True'
-
-if IS_DOCKER:
-    DATABASES = {
-        'default': dj_database_url.config(
-            default='postgresql://prismteam_user:prismteam_pass@db:5432/prismteam',
-            conn_max_age=600,
-            ssl_require=False
-        )
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+DATABASES = {
+    'default': dj_database_url.config(
+        default='sqlite:///db.sqlite3',
+        conn_max_age=600,
+        ssl_require=False
+    )
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
