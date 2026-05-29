@@ -18,6 +18,7 @@ html, body, #root {
   min-height: 100vh;
 }
 
+/* Анимации */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -49,6 +50,16 @@ html, body, #root {
   }
 }
 
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Классы анимаций */
 .animate-fadeIn {
   animation: fadeIn 0.2s ease-out;
 }
@@ -61,6 +72,7 @@ html, body, #root {
   animation: pulse 0.5s ease-in-out infinite;
 }
 
+/* Загрузочный экран */
 .loading-screen {
   position: fixed;
   top: 0;
@@ -79,6 +91,7 @@ html, body, #root {
   font-size: 1.25rem;
 }
 
+/* Переходы между страницами */
 .page-transition-enter {
   opacity: 0;
   transform: translateY(10px);
@@ -101,6 +114,7 @@ html, body, #root {
   transition: opacity 150ms ease-in, transform 150ms ease-in;
 }
 
+/* Эффекты при наведении */
 .card-hover {
   transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
 }
@@ -118,39 +132,14 @@ a {
   transition: color 0.15s ease-out;
 }
 
+/* Скелетон загрузки */
 .skeleton {
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;
   animation: skeleton-loading 1.5s infinite;
 }
 
-@keyframes skeleton-loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes pulse-fast {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
+/* Утилиты */
 .whitespace-nowrap {
   white-space: nowrap;
 }
@@ -158,5 +147,129 @@ a {
 @media (max-width: 640px) {
   .whitespace-nowrap {
     white-space: normal;
+  }
+}
+
+/* Адаптив (если используешь обычные CSS классы) */
+@media (max-width: 768px) {
+  .quiz-container,
+  .results-container {
+    padding: 25px;
+  }
+
+  .timer {
+    font-size: 36px;
+    padding: 15px;
+  }
+
+  .question-text {
+    font-size: 20px;
+  }
+
+  .answer-btn {
+    padding: 15px;
+    font-size: 14px;
+  }
+
+  .score-circle {
+    width: 150px;
+    height: 150px;
+  }
+
+  .score-value {
+    font-size: 48px;
+  }
+
+  .score-label {
+    font-size: 18px;
+  }
+
+  .results-title {
+    font-size: 28px;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 10px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .quiz-container,
+  .results-container {
+    padding: 15px;
+    border-radius: 15px;
+  }
+
+  .timer {
+    font-size: 28px;
+    padding: 10px;
+    margin-bottom: 20px;
+  }
+
+  .question-text {
+    font-size: 18px;
+    margin-bottom: 20px;
+  }
+
+  .answer-btn {
+    padding: 12px;
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  .answers-block {
+    gap: 10px;
+  }
+
+  .score-circle {
+    width: 120px;
+    height: 120px;
+  }
+
+  .score-value {
+    font-size: 36px;
+  }
+
+  .score-label {
+    font-size: 16px;
+  }
+
+  .place-block h2 {
+    font-size: 20px;
+  }
+
+  .play-again-btn {
+    padding: 12px 30px;
+    font-size: 16px;
+  }
+
+  .leaderboard-table {
+    font-size: 12px;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 360px) {
+  .timer {
+    font-size: 24px;
+  }
+
+  .question-text {
+    font-size: 16px;
+  }
+
+  .answer-btn {
+    font-size: 13px;
+    padding: 10px;
+  }
+
+  .score-value {
+    font-size: 32px;
   }
 }
