@@ -13,6 +13,7 @@ from app_modules.quiz.models import Quiz
 
 quiz_log = logging.getLogger('quiz_log')
 
+
 class QuizSessionViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSessionSerializer
 
@@ -25,37 +26,59 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         return QuizSession.objects.all()
 
     def create(self, request, *args, **kwargs):
-        quiz_id = request.data.get('quiz') or request.data.get('quiz_id')
+        logger = logging.getLogger('quiz_log')
+
+        logger.info("=" * 50)
+        logger.info("CREATE SESSION CALLED")
+        logger.info(f"Request data: {request.data}")
+        logger.info(f"User: {request.user}")
+        logger.info(f"Is authenticated: {request.user.is_authenticated}")
+        logger.info("=" * 50)
+
+        quiz_id = request.data.get('quiz_id')
+
         if not quiz_id:
-            return Response({'error': 'quiz_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            quiz_id = request.data.get('quiz')
+
+        if not quiz_id:
+            logger.error("No quiz_id in request")
+            return Response({'error': 'quiz_id is required'}, status=400)
 
         if not request.user.is_authenticated:
-            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+            logger.error("User not authenticated")
+            return Response({'error': 'Authentication required'}, status=401)
 
         try:
-            quiz = Quiz.objects.filter(id=quiz_id, created_by=request.user).first()
-            if not quiz:
-                return Response({'error': 'Квиз не найден'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            quiz = Quiz.objects.get(id=quiz_id)
+            logger.info(f"Found quiz: {quiz.id} - {quiz.title}")
+        except Quiz.DoesNotExist:
+            logger.error(f"Quiz {quiz_id} not found")
+            return Response({'error': 'Квиз не найден'}, status=404)
 
         while True:
             timestamp_part = str(int(time.time() * 1000))[-3:]
             random_part = ''.join(random.choices(string.digits, k=3))
             code = timestamp_part + random_part
-            if not QuizSession.objects.filter(code=code, status='waiting').exists():
+            if not QuizSession.objects.filter(code=code).exists():
                 break
 
         try:
-            session = QuizSession.objects.create(quiz=quiz, code=code, status='waiting')
+            session = QuizSession.objects.create(
+                quiz=quiz,
+                code=code,
+                status='waiting'
+            )
+            logger.info(f"Session created: {session.id} with code {code}")
+
             return Response({
                 'id': session.id,
                 'code': code,
                 'quiz': quiz.id,
                 'status': session.status
-            }, status=status.HTTP_201_CREATED)
+            }, status=201)
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"Error creating session: {str(e)}")
+            return Response({'error': str(e)}, status=400)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny()], url_path='join')
     def join(self, request):
@@ -63,12 +86,12 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         nickname = request.data.get('nickname')
 
         if not code or not nickname:
-            return Response({'error': 'Code and nickname are required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Code and nickname are required'}, status=400)
 
         try:
             master_session = QuizSession.objects.filter(code=code, status__in=['waiting', 'active']).first()
             if not master_session:
-                return Response({'error': 'Сессия не найдена или уже завершена'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'Сессия не найдена или уже завершена'}, status=404)
 
             existing_completed = QuizSession.objects.filter(
                 quiz=master_session.quiz,
@@ -77,14 +100,25 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             ).first()
 
             if existing_completed:
-                return Response({'error': 'Вы уже проходили этот квиз'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Вы уже проходили этот квиз'}, status=400)
 
-            existing_player = QuizSession.objects.filter(code=code, participant_name=nickname, is_completed=False).first()
+            if master_session.quiz.created_by.username == nickname:
+                existing_creator_completed = QuizSession.objects.filter(
+                    quiz=master_session.quiz,
+                    participant_name=nickname,
+                    is_completed=True
+                ).first()
+                if existing_creator_completed:
+                    return Response({'error': 'Вы уже проходили этот квиз как создатель'}, status=400)
+
+            existing_player = QuizSession.objects.filter(code=code, participant_name=nickname,
+                                                         is_completed=False).first()
             if existing_player:
-                return Response(
-                    {'session_id': existing_player.id, 'code': existing_player.code,
-                     'quiz_title': existing_player.quiz.title},
-                    status=status.HTTP_200_OK)
+                return Response({
+                    'session_id': existing_player.id,
+                    'code': existing_player.code,
+                    'quiz_title': existing_player.quiz.title
+                }, status=200)
 
             player_session = QuizSession.objects.create(
                 quiz=master_session.quiz,
@@ -93,11 +127,13 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 status='waiting'
             )
 
-            return Response(
-                {'session_id': player_session.id, 'code': player_session.code, 'quiz_title': player_session.quiz.title},
-                status=status.HTTP_200_OK)
+            return Response({
+                'session_id': player_session.id,
+                'code': player_session.code,
+                'quiz_title': player_session.quiz.title
+            }, status=200)
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(e)}, status=400)
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
@@ -284,10 +320,10 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
-            return Response([], status=status.HTTP_404_NOT_FOUND)
+            return Response([], status=404)
 
         try:
-            all_sessions = QuizSession.objects.filter(code=session.code, is_completed=True)
+            all_sessions = QuizSession.objects.filter(quiz=session.quiz, is_completed=True)
             players_summary = {}
 
             for s in all_sessions:
@@ -310,10 +346,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                         else:
                             points += q_points
 
-                if name == "Организатор" and points == 0 and all_sessions.exclude(
-                        participant_name__isnull=True).exists():
-                    continue
-
                 if name not in players_summary or points > players_summary[name]:
                     players_summary[name] = points
 
@@ -331,7 +363,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
             return Response(leaderboard)
         except Exception as e:
-            return Response([], status=status.HTTP_400_BAD_REQUEST)
+            return Response([], status=400)
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def questions_stats(self, request, pk=None):

@@ -2,11 +2,11 @@ services:
   - type: web
     name: prismteam-backend
     runtime: python
-    repo: https://gitlab.com/your-repo/prismteam.git
-    plan: free
-    region: frankfurt
-    buildCommand: pip install -r requirements.txt
-    startCommand: daphne -b 0.0.0.0 -p 8000 config.asgi:application
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py migrate --noinput
+      python manage.py collectstatic --noinput
+    startCommand: daphne -b 0.0.0.0 -p 10000 config.asgi:application
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -23,6 +23,8 @@ services:
         value: false
       - key: ALLOWED_HOSTS
         value: prismteam-backend.onrender.com,localhost,127.0.0.1
+      - key: RENDER
+        value: true
       - key: RENDER_BACKEND_URL
         value: https://prismteam-backend.onrender.com
       - key: RENDER_FRONTEND_URL
@@ -31,9 +33,6 @@ services:
   - type: web
     name: prismteam-frontend
     runtime: static
-    repo: https://gitlab.com/your-repo/prismteam.git
-    plan: free
-    region: frankfurt
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     envVars:
@@ -43,11 +42,9 @@ services:
   - type: redis
     name: prismteam-redis
     plan: free
-    region: frankfurt
     maxmemoryPolicy: noeviction
 
 databases:
   - name: prismteam-db
     databaseName: prismteam
     plan: free
-    region: frankfurt

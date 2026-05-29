@@ -23,12 +23,10 @@ urlpatterns = [
     path('login/', UserLogin.as_view(), name='login'),
     path('main/', Main.as_view(), name='main'),
     path('logout/', UserLogout.as_view(), name='logout'),
-
     path('api/auth/register/', UserRegistrationAPI.as_view(), name='api_register'),
     path('api/auth/login/', UserLoginAPI.as_view(), name='api_login'),
     path('api/auth/me/', GetCurrentUserAPI.as_view(), name='auth_me'),
     path('api/auth/refresh/', TokenRefreshAPI.as_view(), name='api_refresh'),
-
     path('api/organizer/', include(router.urls)),
     path('api/sessions/join/', include('app_modules.quiz_sessions.urls')),
 ]

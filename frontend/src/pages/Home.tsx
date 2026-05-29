@@ -11,17 +11,23 @@ const Home: React.FC = () => {
   const isAuthenticated = !!user;
 
   const handleLogout = async () => {
-    try {
-      await authApi.logout();
-      setUser(null);
-      localStorage.removeItem('app-storage');
-      navigate('/', { replace: true });
-    } catch (error) {
-      setUser(null);
-      localStorage.removeItem('app-storage');
-      navigate('/', { replace: true });
-    }
-  };
+  try {
+    await authApi.logout();
+    setUser(null);
+    localStorage.removeItem('app-storage');
+    document.cookie.split(";").forEach(function(c) {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    navigate('/', { replace: true });
+    window.location.href = '/';
+  } catch (error) {
+    console.error('Logout error:', error);
+    setUser(null);
+    localStorage.removeItem('app-storage');
+    navigate('/', { replace: true });
+    window.location.href = '/';
+  }
+};
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">

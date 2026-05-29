@@ -1,6 +1,9 @@
 import axios from 'axios';
 
 const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
   if (window.location.hostname.includes('onrender.com')) {
     return 'https://prismteam-backend.onrender.com';
   }

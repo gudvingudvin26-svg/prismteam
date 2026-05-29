@@ -190,6 +190,8 @@ class Main(APIView):
 
 
 class UserLogout(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request):
         username = request.user.username if request.user.is_authenticated else 'Аноним'
         user_id = request.user.id if request.user.is_authenticated else None
@@ -206,6 +208,7 @@ class UserLogout(APIView):
         response.delete_cookie('refresh_token', path='/')
         response.delete_cookie('csrftoken', path='/')
         response.delete_cookie('sessionid', path='/')
+        response['Access-Control-Allow-Credentials'] = 'true'
         return response
 
     def get(self, request):
@@ -216,6 +219,7 @@ class UserLogout(APIView):
         response.delete_cookie('refresh_token', path='/')
         response.delete_cookie('csrftoken', path='/')
         response.delete_cookie('sessionid', path='/')
+        response['Access-Control-Allow-Credentials'] = 'true'
         return response
 
 

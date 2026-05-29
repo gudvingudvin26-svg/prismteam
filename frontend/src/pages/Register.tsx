@@ -68,20 +68,50 @@ const Register: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <Input label="Имя пользователя" value={username} onChange={(e) => setUsername(e.target.value)} required />
-          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input label="Пароль" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <Input label="Подтверждение пароля" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+          <Input
+            label="Имя пользователя"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+          <Input
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <Input
+            label="Пароль"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <Input
+            label="Подтверждение пароля"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
 
-          {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">{error}</div>}
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
 
           <Button type="submit" fullWidth isLoading={loading}>
-            Зарегистрироваться
+            {loading ? 'Регистрация...' : 'Зарегистрироваться'}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-gray-600">
-          Уже есть аккаунт? <Link to="/login" className="text-purple-600 hover:underline">Войти</Link>
+          Уже есть аккаунт?{' '}
+          <Link to="/login" className="text-purple-600 hover:text-purple-700 font-medium hover:underline">
+            Войти
+          </Link>
         </p>
       </Card>
     </div>

@@ -31,9 +31,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -94,83 +94,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LOG_DIR = os.path.join(BASE_DIR, 'logs')
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR, exist_ok=True)
-
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "simple": {
-            "format": '{asctime} - {levelname} - {message}',
-            "style": "{",
-        },
-        "verbose": {
-            "format": '[{asctime}] {levelname} {name} ({filename}:{lineno}): {message}',
-            "style": "{",
-        },
-    },
-    "filters": {
-        "info_or_error": {
-            "()": "app_modules.quiz.log_filters.InfoOrErrorFilter",
-        }
-    },
-    "handlers": {
-        "console": {
-            "level": "INFO",
-            "class": "logging.StreamHandler",
-            "formatter": "simple",
-        },
-        "ws_file": {
-            "level": "DEBUG",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(LOG_DIR, 'websocket.log'),
-            "formatter": "verbose",
-            "maxBytes": 5 * 1024 * 1024,
-            "backupCount": 3,
-        },
-        "app_file": {
-            "level": "DEBUG",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(LOG_DIR, 'app.log'),
-            "formatter": "verbose",
-            "maxBytes": 10 * 1024 * 1024,
-            "backupCount": 5,
-        },
-        "error_file": {
-            "level": "ERROR",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(LOG_DIR, 'error.log'),
-            "formatter": "verbose",
-            "maxBytes": 10 * 1024 * 1024,
-            "backupCount": 3,
-        },
-    },
-    'loggers': {
-        "login_log": {
-            "handlers": ["console", "app_file"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "quiz_log": {
-            "handlers": ["console", "app_file"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "ws": {
-            "handlers": ["ws_file", "app_file", "console"],
-            "level": "DEBUG",
-            "propagate": False,
-        },
-        "django.request": {
-            "handlers": ["error_file", "app_file"],
-            "level": "ERROR",
-            "propagate": False,
-        },
-    },
-}
-
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
@@ -178,6 +101,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 AUTH_USER_MODEL = 'quiz.User'
 
@@ -189,6 +113,10 @@ CORS_ALLOWED_ORIGINS = [
     'https://prismteam-frontend.onrender.com',
     'https://prismteam-backend.onrender.com',
 ]
+
+if RENDER_FRONTEND_URL:
+    CORS_ALLOWED_ORIGINS.append(RENDER_FRONTEND_URL)
+    CORS_ALLOWED_ORIGINS.append(RENDER_FRONTEND_URL.replace('https://', 'http://'))
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -215,12 +143,7 @@ CORS_ALLOW_HEADERS = [
 
 CORS_EXPOSE_HEADERS = ['content-type', 'set-cookie']
 
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'https://prismteam-frontend.onrender.com',
-    'https://prismteam-backend.onrender.com',
-]
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
 
 SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
@@ -242,3 +165,42 @@ REST_FRAMEWORK = {
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+if os.environ.get('RENDER', False):
+    import sys
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'stream': sys.stdout,
+            },
+        },
+        'root': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+        },
+        'loggers': {
+            'login_log': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'quiz_log': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'ws': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'django': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': True,
+            },
+        },
+    }

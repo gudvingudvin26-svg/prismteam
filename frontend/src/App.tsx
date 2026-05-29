@@ -40,15 +40,15 @@ function AppContent() {
         return;
       }
 
-      if (user) {
-        setIsAppLoading(false);
-        return;
-      }
-
       try {
         const response = await authApi.getCurrentUser();
-        setUser(response.data);
+        if (response.data && response.data.id) {
+          setUser(response.data);
+        } else {
+          setUser(null);
+        }
       } catch (error) {
+        console.error('Not authenticated:', error);
         setUser(null);
       } finally {
         setTimeout(() => setIsAppLoading(false), 100);
@@ -56,7 +56,7 @@ function AppContent() {
     };
 
     restoreUser();
-  }, [location.pathname, user, setUser]);
+  }, [location.pathname]);
 
   if (isAppLoading) {
     return <LoadingSpinner />;
@@ -74,48 +74,11 @@ function AppContent() {
           <Route path="/results/:sessionId" element={<Results />} />
           <Route path="/access-denied" element={<AccessDenied />} />
           <Route path="/not-found" element={<NotFound />} />
-
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/quizzes"
-            element={
-              <PrivateRoute>
-                <QuizList />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/quizzes/create"
-            element={
-              <PrivateRoute>
-                <CreateQuiz />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/quizzes/:id/edit"
-            element={
-              <PrivateRoute>
-                <EditQuiz />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/stats"
-            element={
-              <PrivateRoute>
-                <Stats />
-              </PrivateRoute>
-            }
-          />
-
+          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/quizzes" element={<PrivateRoute><QuizList /></PrivateRoute>} />
+          <Route path="/quizzes/create" element={<PrivateRoute><CreateQuiz /></PrivateRoute>} />
+          <Route path="/quizzes/:id/edit" element={<PrivateRoute><EditQuiz /></PrivateRoute>} />
+          <Route path="/stats" element={<PrivateRoute><Stats /></PrivateRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

@@ -81,19 +81,21 @@ const QuizList: React.FC = () => {
   };
 
   const handleRun = async (quizId: number) => {
-    const participantName = user?.first_name || user?.username || 'Организатор';
-
     try {
       const res = await sessionsApi.createSession(quizId);
+      console.log('Session created:', res.data);
+
       setSessionCode(res.data.code);
       setSelectedSessionId(res.data.id);
-
-      await sessionsApi.joinSession(res.data.code, participantName);
-
       setModalOpen(true);
     } catch (err: any) {
+      console.error('Full error:', err);
+      console.error('Response data:', err.response?.data);
+      console.error('Response status:', err.response?.status);
+
       const status = err.response?.status;
       const data = err.response?.data;
+
       if (status === 401) {
         navigate('/login');
       } else if (status === 403) {
@@ -101,9 +103,8 @@ const QuizList: React.FC = () => {
       } else if (status === 404) {
         setError('Квиз не найден');
       } else {
-        setError(data?.error || 'Не удалось создать сессию');
+        setError(data?.error || data?.detail || 'Не удалось создать сессию');
       }
-      console.error(err);
     }
   };
 

@@ -2,7 +2,6 @@ from rest_framework import serializers
 from .models import QuizSession
 from app_modules.quiz.models import Quiz
 
-
 class QuizSessionSerializer(serializers.ModelSerializer):
     quiz_id = serializers.IntegerField(write_only=True, required=False)
     quiz = serializers.PrimaryKeyRelatedField(queryset=Quiz.objects.all(), required=False)
