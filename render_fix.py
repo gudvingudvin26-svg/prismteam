@@ -23,6 +23,24 @@ def main():
 
     with connection.cursor() as cursor:
         try:
+            cursor.execute("""
+                DELETE FROM quiz_session 
+                WHERE id IN (
+                    SELECT id FROM (
+                        SELECT id, ROW_NUMBER() OVER (
+                            PARTITION BY quiz_id, participant_name, is_completed 
+                            ORDER BY id
+                        ) as rnum 
+                        FROM quiz_session
+                    ) t 
+                    WHERE t.rnum > 1
+                )
+            """)
+            print(">>> Removed duplicate entries from quiz_session.")
+        except Exception as e:
+            print(f">>> Could not remove duplicates: {e}")
+
+        try:
             cursor.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'quiz_session')")
             table_exists = cursor.fetchone()[0]
             if table_exists:
