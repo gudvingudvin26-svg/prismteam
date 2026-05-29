@@ -13,7 +13,6 @@ from app_modules.quiz.models import Quiz
 
 quiz_log = logging.getLogger('quiz_log')
 
-
 class QuizSessionViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSessionSerializer
 
@@ -49,8 +48,12 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
         try:
             session = QuizSession.objects.create(quiz=quiz, code=code, status='waiting')
-            return Response({'id': session.id, 'code': code, 'quiz': quiz.id, 'status': session.status},
-                            status=status.HTTP_201_CREATED)
+            return Response({
+                'id': session.id,
+                'code': code,
+                'quiz': quiz.id,
+                'status': session.status
+            }, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -76,8 +79,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             if existing_completed:
                 return Response({'error': 'Вы уже проходили этот квиз'}, status=status.HTTP_400_BAD_REQUEST)
 
-            existing_player = QuizSession.objects.filter(code=code, participant_name=nickname,
-                                                         is_completed=False).first()
+            existing_player = QuizSession.objects.filter(code=code, participant_name=nickname, is_completed=False).first()
             if existing_player:
                 return Response(
                     {'session_id': existing_player.id, 'code': existing_player.code,

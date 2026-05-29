@@ -33,7 +33,7 @@ const QuizList: React.FC = () => {
           const sessionsRes = await sessionsApi.getSessionsForQuiz(quiz.id!);
           const uniqueParticipants = new Set();
           for (const session of sessionsRes.data) {
-            if (session.participant_name) {
+            if (session.participant_name && session.is_completed) {
               uniqueParticipants.add(session.participant_name);
             }
           }
@@ -59,12 +59,6 @@ const QuizList: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    const quiz = quizzes.find(q => q.id === id);
-    if (quiz?.sessions?.some(s => s.status === 'active')) {
-      setError('Нельзя удалить квиз, в который кто-то играет');
-      return;
-    }
-
     if (window.confirm('Удалить квиз? Все связанные сессии и ответы будут удалены.')) {
       try {
         await quizzesApi.deleteQuiz(id);
@@ -83,11 +77,6 @@ const QuizList: React.FC = () => {
   };
 
   const handleEdit = (id: number) => {
-    const quiz = quizzes.find(q => q.id === id);
-    if (quiz?.sessions?.some(s => s.status === 'active')) {
-      setError('Нельзя редактировать квиз, в который кто-то играет');
-      return;
-    }
     navigate(`/quizzes/${id}/edit`);
   };
 
@@ -104,6 +93,7 @@ const QuizList: React.FC = () => {
       setModalOpen(true);
     } catch (err: any) {
       const status = err.response?.status;
+      const data = err.response?.data;
       if (status === 401) {
         navigate('/login');
       } else if (status === 403) {
@@ -111,7 +101,7 @@ const QuizList: React.FC = () => {
       } else if (status === 404) {
         setError('Квиз не найден');
       } else {
-        setError('Не удалось создать сессию');
+        setError(data?.error || 'Не удалось создать сессию');
       }
       console.error(err);
     }

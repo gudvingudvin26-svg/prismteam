@@ -2,7 +2,7 @@ import api from './api'
 
 export const sessionsApi = {
   createSession: (quizId: number) =>
-    api.post('/api/organizer/sessions/', { quiz: quizId }),
+    api.post('/api/organizer/sessions/', { quiz_id: quizId }),
 
   joinSession: (code: string, nickname: string) =>
     api.post('/api/organizer/sessions/join/', { code, nickname }),
@@ -20,7 +20,7 @@ export const sessionsApi = {
     api.get(`/api/organizer/sessions/?quiz=${quizId}`),
 
   getCurrentQuestion: (sessionId: number, index: number = 0) =>
-    api.get(`/api/organizer/sessions/${sessionId}/?index=${index}`),
+    api.get(`/api/organizer/sessions/${sessionId}/`, { params: { index } }),
 
   submitAnswer: (sessionId: number, questionId: number, answerId: number) =>
     api.post(`/api/organizer/sessions/${sessionId}/answer/`, {
