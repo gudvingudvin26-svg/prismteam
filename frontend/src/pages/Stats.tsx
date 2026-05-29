@@ -48,8 +48,11 @@ const Stats: React.FC = () => {
 
     try {
       const sessionsResponse = await sessionsApi.getSessionsForQuiz(quizId);
-      const sessions = sessionsResponse.data;
-
+      const sessions = (sessionsResponse.data || []).filter(
+        (session: any) =>
+        session.quiz === quizId ||
+        session.quiz_id === quizId
+      );
       const uniqueParticipants = new Map();
 
       for (const session of sessions) {
@@ -76,13 +79,14 @@ const Stats: React.FC = () => {
           }
         }
       }
-
-      const completedSessions = sessions.filter((s: any) => s.status === 'completed');
+      const completedSessions = sessions.filter((s: any) => (s.quiz === quizId || s.quiz_id === quizId) && s.status === 'completed' );
       const totalScore = Array.from(uniqueParticipants.values()).reduce((sum, score) => sum + score, 0);
       const averageScore = uniqueParticipants.size > 0 ? Math.round(totalScore / uniqueParticipants.size) : 0;
 
+      const totalQuizLaunches = sessions.filter((s: any) => (s.quiz === quizId || s.quiz_id === quizId) && !s.participant_name).length;
+
       setQuizStats({
-        total_sessions: sessions.length,
+        total_sessions: totalQuizLaunches,
         total_participants: uniqueParticipants.size,
         completed_sessions: completedSessions.length,
         average_score: averageScore
@@ -96,38 +100,60 @@ const Stats: React.FC = () => {
       setLeaderboard(leaderboardData);
 
       if (completedSessions.length > 0) {
-        const allQuestionsStats: { [key: number]: { text: string; total: number; correct: number } } = {};
+        const allQuestionsStats: {
+          [key: number]: {
+            text: string;
+            total: number;
+            correct: number;
+          };
+        } = {};
 
-        for (const session of completedSessions.slice(0, 5)) {
-          try {
-            const statsResponse = await sessionsApi.getQuestionsStats(session.id);
-            if (Array.isArray(statsResponse.data)) {
-              for (const stat of statsResponse.data) {
-                if (!allQuestionsStats[stat.question_id]) {
-                  allQuestionsStats[stat.question_id] = {
-                    text: stat.question_text,
-                    total: 0,
-                    correct: 0
-                  };
+        for (const session of completedSessions) {
+
+          if (session.quiz !== quizId && session.quiz_id !== quizId) {
+            continue;
+          }
+
+        try {
+          const statsResponse = await sessionsApi.getQuestionsStats(session.id);
+          if (Array.isArray(statsResponse.data)) {
+            for (const stat of statsResponse.data) {
+              if (
+                stat.quiz_id &&
+                Number(stat.quiz_id) !== Number(quizId)
+                ) {
+                  continue;
                 }
-                allQuestionsStats[stat.question_id].total += stat.total_answers || 0;
-                allQuestionsStats[stat.question_id].correct += stat.correct_count || 0;
-              }
+
+              if (!allQuestionsStats[stat.question_id]) {
+                allQuestionsStats[stat.question_id] = {
+                text: stat.question_text,
+                total: 0,
+                correct: 0,
+              };
             }
-          } catch (e) {
-            console.error('Error fetching stats:', e);
+
+            allQuestionsStats[stat.question_id].total += Number(stat.total_answers || 0);
+            allQuestionsStats[stat.question_id].correct += Number(stat.correct_count || 0);
           }
         }
-
-        const formattedStats = Object.values(allQuestionsStats).map(stat => ({
-          question_text: stat.text,
-          total_answers: stat.total,
-          correct_count: stat.correct,
-          correct_percent: stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0
-        }));
-
-        setQuestionsStats(formattedStats);
+      } catch (e) {
+        console.error('Error fetching stats:', e);
       }
+    }
+
+    const formattedStats = Object.values(allQuestionsStats).map((stat) => ({
+      question_text: stat.text,
+      total_answers: stat.total,
+      correct_count: stat.correct,
+      correct_percent:
+        stat.total > 0
+          ? Math.round((stat.correct / stat.total) * 100)
+          : 0,
+    }));
+
+    setQuestionsStats(formattedStats);
+  }
     } catch (error) {
       console.error('Error loading quiz stats:', error);
     }

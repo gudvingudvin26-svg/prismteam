@@ -68,7 +68,10 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Code and nickname are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            master_session = QuizSession.objects.filter(code=code).first()
+            master_session = QuizSession.objects.filter(
+                code=code,
+                participant_name__isnull=True
+            ).first()
             if not master_session:
                 return Response({'error': 'Сессия не найдена'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -229,7 +232,10 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
             total_questions = session.quiz.questions.count()
 
-            all_sessions = QuizSession.objects.filter(code=session.code)
+            all_sessions = QuizSession.objects.filter(
+                code=session.code,
+                participant_name__isnull=False
+            )
             scores = {}
             for s in all_sessions:
                 points = 0
@@ -279,7 +285,10 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response([], status=status.HTTP_404_NOT_FOUND)
 
         try:
-            all_sessions = QuizSession.objects.filter(code=session.code)
+            all_sessions = QuizSession.objects.filter(
+                code=session.code,
+                participant_name__isnull=False
+            )
             players_summary = {}
 
             for s in all_sessions:
