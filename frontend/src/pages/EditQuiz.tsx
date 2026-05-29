@@ -213,8 +213,7 @@ const EditQuiz: React.FC = () => {
           answer_options: q.answers.map(a => ({
             text: a.text.trim(),
             is_correct: a.is_correct
-          })),
-          quiz: parseInt(id)
+          }))
         };
 
         if (q.timer && q.timer > 0) {
@@ -224,7 +223,10 @@ const EditQuiz: React.FC = () => {
         if (q.id) {
           await quizzesApi.updateQuestion(q.id, questionData);
         } else {
-          await quizzesApi.createQuestion(parseInt(id), questionData);
+          await quizzesApi.createQuestion(parseInt(id), {
+            ...questionData,
+            quiz: parseInt(id)
+          });
         }
       }
 

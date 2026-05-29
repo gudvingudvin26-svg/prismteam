@@ -26,6 +26,9 @@ class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
         fields = ['id', 'quiz', 'text', 'order', 'question_type', 'timer', 'points', 'answer_options']
+        extra_kwargs = {
+            'quiz': {'required': False}
+        }
 
     def validate_answer_options(self, value):
         validate_answer_options_data(value)
