@@ -1,19 +1,31 @@
-from typing import Dict, Any, Optional
-from django.contrib.auth import get_user_model
-from .models import Quiz, Question, AnswerOption
-import logging
+from typing import Dict, Any
 
-logger = logging.getLogger('quiz_log')
+from .models import Quiz
+
 
 class QuizFactory:
+    """
+    Фабрика для создания объектов Quiz.
+    """
+
     @staticmethod
     def create_quiz(data: Dict[str, Any], user) -> Quiz:
-        quiz = Quiz.objects.create(
-            title=data.get('title'),
-            description=data.get('description', ''),
-            created_by=user,
-            timer=data.get('timer'),
-            points_per_question=data.get('points_per_question', 100)
-        )
-        logger.info(f"Quiz created: {quiz.id} by user {user.username}")
+        """
+        Создание квиза от имени пользователя.
+
+        :param data: провалидированные данные serializer.validated_data
+        :param user: пользователь-создатель
+        :return: объект Quiz
+        """
+
+        quiz_data = {
+            'title': data.get('title'),
+            'description': data.get('description'),
+            'timer': data.get('timer'),
+            'points_per_question': data.get('points_per_question', 100),
+            'created_by': user,
+        }
+
+        quiz = Quiz.objects.create(**quiz_data)
+
         return quiz

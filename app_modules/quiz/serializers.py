@@ -1,6 +1,9 @@
 import logging
 from rest_framework import serializers
 from .models import User, Question, AnswerOption, Quiz
+from .validators import validate_answer_options_data
+from .repositories import QuestionRepository
+
 from .validators import (
     validate_answer_options_data,
     _is_meaningful_text,
@@ -104,6 +107,7 @@ class QuestionSerializer(serializers.ModelSerializer):
 
         return question
 
+
     def update(self, instance, validated_data):
         options_data = validated_data.pop('answer_options', None)
 
@@ -111,6 +115,10 @@ class QuestionSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
 
         instance.save()
+        options_data = validated_data.pop(
+            'answer_options',
+            None
+        )
 
         if options_data is not None:
             instance.answer_options.all().delete()
@@ -125,6 +133,7 @@ class QuestionSerializer(serializers.ModelSerializer):
         )
         quiz_log.info('Организатор успешно обновил вопрос в квизе')
         return instance
+
 
 
 class QuizSerializer(serializers.ModelSerializer):
