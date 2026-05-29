@@ -73,6 +73,15 @@ const EditQuiz: React.FC = () => {
     if (questions.length < 2) return 'Добавьте хотя бы два вопроса';
     if (!title.trim()) return 'Введите название квиза';
 
+    if (globalTimer && globalTimer > 0) {
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        if (q.timer && q.timer > globalTimer) {
+          return `Вопрос ${i + 1}: таймер вопроса (${q.timer} сек) не может превышать таймер всего квиза (${globalTimer} сек)`;
+        }
+      }
+    }
+
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (!q.text.trim()) return `Вопрос ${i + 1}: введите текст вопроса`;
@@ -352,7 +361,12 @@ const EditQuiz: React.FC = () => {
                   value={q.timer || ''}
                   onChange={(e) => {
                     const value = e.target.value ? Number(e.target.value) : undefined;
-                    updateQuestion(qIdx, 'timer', (value !== undefined && value <= 0) ? undefined : value);
+                    if (globalTimer && value && value > globalTimer) {
+                      setError(`Таймер вопроса не может превышать таймер всего квиза (${globalTimer} сек)`);
+                    } else {
+                      setError('');
+                      updateQuestion(qIdx, 'timer', (value !== undefined && value <= 0) ? undefined : value);
+                    }
                   }}
                   min="1"
                   step="1"

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Button from '../../components/ui/Button';
-import Input from '../../components/ui/Input';
-import Card from '../../components/ui/Card';
+import { Button, Input, Card } from '../../components/ui';
 import { quizzesApi } from '../../api';
 
 interface AnswerForm {
@@ -133,6 +131,16 @@ const CreateQuiz: React.FC = () => {
     if (!title.trim()) {
       return 'Введите название квиза';
     }
+
+    if (globalTimer && globalTimer > 0) {
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        if (q.timer && q.timer > globalTimer) {
+          return `Вопрос ${i + 1}: таймер вопроса (${q.timer} сек) не может превышать таймер всего квиза (${globalTimer} сек)`;
+        }
+      }
+    }
+
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (!q.text.trim()) {
@@ -307,7 +315,12 @@ const CreateQuiz: React.FC = () => {
                     value={timer || ''}
                     onChange={(e) => {
                       const value = e.target.value ? Number(e.target.value) : undefined;
-                      updateQuestion(qIdx, 'timer', (value !== undefined && value <= 0) ? undefined : value);
+                      if (globalTimer && value && value > globalTimer) {
+                        setError(`Таймер вопроса не может превышать таймер всего квиза (${globalTimer} сек)`);
+                      } else {
+                        setError('');
+                        updateQuestion(qIdx, 'timer', (value !== undefined && value <= 0) ? undefined : value);
+                      }
                     }}
                     min="1"
                     step="1"
