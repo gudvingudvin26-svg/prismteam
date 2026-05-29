@@ -24,6 +24,20 @@ def main():
     with connection.cursor() as cursor:
         try:
             cursor.execute("""
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='quiz_session' AND column_name='is_completed') THEN
+                        ALTER TABLE quiz_session ADD COLUMN is_completed boolean DEFAULT false;
+                    END IF;
+                END $$;
+            """)
+            print(">>> Ensured is_completed column exists.")
+        except Exception as e:
+            print(f">>> Could not add is_completed column: {e}")
+
+        try:
+            cursor.execute("""
                 DELETE FROM quiz_session 
                 WHERE id IN (
                     SELECT id FROM (
@@ -39,6 +53,19 @@ def main():
             print(">>> Removed duplicate entries from quiz_session.")
         except Exception as e:
             print(f">>> Could not remove duplicates: {e}")
+
+        try:
+            cursor.execute("""
+                DO $$ 
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'quiz_session_quiz_id_participant_name_b1f1eb3a_uniq') THEN
+                        ALTER TABLE quiz_session DROP CONSTRAINT quiz_session_quiz_id_participant_name_b1f1eb3a_uniq;
+                    END IF;
+                END $$;
+            """)
+            print(">>> Dropped unique constraint if existed.")
+        except Exception as e:
+            print(f">>> Could not drop constraint: {e}")
 
         try:
             cursor.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'quiz_session')")
