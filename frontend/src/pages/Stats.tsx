@@ -53,6 +53,10 @@ const Stats: React.FC = () => {
         session.quiz === quizId ||
         session.quiz_id === quizId
       );
+      const currentUser =
+        localStorage.getItem('username') ||
+        localStorage.getItem('userName') ||
+        localStorage.getItem('email');
       const uniqueParticipants = new Map();
 
       for (const session of sessions) {
@@ -64,6 +68,9 @@ const Stats: React.FC = () => {
             if (Array.isArray(results)) {
               for (const result of results) {
                 const name = result.participant_name || session.participant_name;
+                if (!name || name === currentUser || name.toLowerCase().includes('organizer')) {
+                  continue;
+                }
                 if (!uniqueParticipants.has(name) || uniqueParticipants.get(name) < result.score) {
                   uniqueParticipants.set(name, result.score);
                 }
@@ -79,7 +86,7 @@ const Stats: React.FC = () => {
           }
         }
       }
-      const completedSessions = sessions.filter((s: any) => (s.quiz === quizId || s.quiz_id === quizId) && s.status === 'completed' );
+      const completedSessions = sessions.filter((s: any) => (s.quiz === quizId || s.quiz_id === quizId) && s.status === 'completed' && s.participant_name && s.participant_name !== currentUser);
       const totalScore = Array.from(uniqueParticipants.values()).reduce((sum, score) => sum + score, 0);
       const averageScore = uniqueParticipants.size > 0 ? Math.round(totalScore / uniqueParticipants.size) : 0;
 
