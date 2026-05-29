@@ -295,9 +295,11 @@ class UserRegistrationAPI(APIView):
 
 class UserLoginAPI(APIView):
     throttle_classes = [AnonRateThrottle]
+
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
+
         if not email or not password:
             return Response(
                 {'error': 'Требуется email и пароль'},
@@ -317,12 +319,15 @@ class UserLoginAPI(APIView):
                 {'detail': 'Неверный email или пароль'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
+
         refresh = RefreshToken.for_user(current_user)
         login(request, current_user)
+
         login_log.info(
             f"API вход успешен: {current_user.username}",
             extra={'user_id': current_user.id}
         )
+
         response = Response({
             'user': {
                 'id': current_user.id,
@@ -332,12 +337,13 @@ class UserLoginAPI(APIView):
                 'last_name': current_user.last_name
             }
         }, status=status.HTTP_200_OK)
+
         response.set_cookie(
             'access_token',
             str(refresh.access_token),
             httponly=True,
-            secure=False,
-            samesite='Lax',
+            secure=True,
+            samesite='None',
             max_age=3600 * 24,
             path='/'
         )
@@ -345,8 +351,8 @@ class UserLoginAPI(APIView):
             'refresh_token',
             str(refresh),
             httponly=True,
-            secure=False,
-            samesite='Lax',
+            secure=True,
+            samesite='None',
             max_age=3600 * 24 * 7,
             path='/'
         )
@@ -370,8 +376,8 @@ class TokenRefreshAPI(APIView):
                 'access_token',
                 access_token,
                 httponly=True,
-                secure=False,
-                samesite='Lax',
+                secure=True,
+                samesite='None',
                 max_age=3600 * 24,
                 path='/'
             )
