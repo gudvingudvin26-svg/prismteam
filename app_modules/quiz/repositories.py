@@ -170,6 +170,12 @@ class AnswerOptionRepository(BaseRepository[AnswerOption]):
     model = AnswerOption
 
     @classmethod
+    def get_user_answers(cls, user):
+        return cls.get_queryset().filter(
+            question__quiz__created_by=user
+        )
+
+    @classmethod
     def get_queryset(cls):
         return (
             cls.model.objects
