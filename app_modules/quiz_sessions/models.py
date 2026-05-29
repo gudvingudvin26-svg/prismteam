@@ -1,7 +1,6 @@
 from django.db import models
 from app_modules.quiz.models import Quiz, Question, AnswerOption
 
-
 class QuizSession(models.Model):
     STATUS_CHOICES = [
         ('waiting', 'Waiting'),
@@ -16,16 +15,17 @@ class QuizSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
+    is_completed = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'quiz_session'
         indexes = [
             models.Index(fields=['code', 'status']),
         ]
+        unique_together = [['quiz', 'participant_name', 'is_completed']]
 
     def __str__(self):
         return f"{self.quiz.title} - {self.code} ({self.participant_name})"
-
 
 class ParticipantAnswer(models.Model):
     session = models.ForeignKey(QuizSession, on_delete=models.CASCADE, related_name='answers')

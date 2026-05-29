@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button, Card, Modal } from '../../components/ui';
 import { quizzesApi, sessionsApi } from '../../api';
 import { Quiz } from '../../types';
@@ -14,6 +14,7 @@ const QuizList: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [sessionCode, setSessionCode] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [participantCount, setParticipantCount] = useState<{ [key: number]: number }>({});
 
   useEffect(() => {
     loadQuizzes();
@@ -25,6 +26,23 @@ const QuizList: React.FC = () => {
     try {
       const res = await quizzesApi.getMyQuizzes();
       setQuizzes(res.data);
+
+      const counts: { [key: number]: number } = {};
+      for (const quiz of res.data) {
+        try {
+          const sessionsRes = await sessionsApi.getSessionsForQuiz(quiz.id!);
+          const uniqueParticipants = new Set();
+          for (const session of sessionsRes.data) {
+            if (session.participant_name) {
+              uniqueParticipants.add(session.participant_name);
+            }
+          }
+          counts[quiz.id!] = uniqueParticipants.size;
+        } catch (e) {
+          counts[quiz.id!] = 0;
+        }
+      }
+      setParticipantCount(counts);
     } catch (err: any) {
       const status = err.response?.status;
       if (status === 401) {
@@ -41,6 +59,12 @@ const QuizList: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
+    const quiz = quizzes.find(q => q.id === id);
+    if (quiz?.sessions?.some(s => s.status === 'active')) {
+      setError('Нельзя удалить квиз, в который кто-то играет');
+      return;
+    }
+
     if (window.confirm('Удалить квиз? Все связанные сессии и ответы будут удалены.')) {
       try {
         await quizzesApi.deleteQuiz(id);
@@ -59,11 +83,16 @@ const QuizList: React.FC = () => {
   };
 
   const handleEdit = (id: number) => {
+    const quiz = quizzes.find(q => q.id === id);
+    if (quiz?.sessions?.some(s => s.status === 'active')) {
+      setError('Нельзя редактировать квиз, в который кто-то играет');
+      return;
+    }
     navigate(`/quizzes/${id}/edit`);
   };
 
   const handleRun = async (quizId: number) => {
-    const participantName = user?.first_name || user?.username || 'Участник';
+    const participantName = user?.first_name || user?.username || 'Организатор';
 
     try {
       const res = await sessionsApi.createSession(quizId);
@@ -133,8 +162,11 @@ const QuizList: React.FC = () => {
               <Card key={quiz.id} className="p-5 bg-white/90 backdrop-blur-sm">
                 <h3 className="text-xl font-semibold mb-2 text-gray-900">{quiz.title}</h3>
                 <p className="text-gray-600 mb-4">{quiz.description || 'Без описания'}</p>
-                <div className="text-sm text-gray-500 mb-4">
+                <div className="text-sm text-gray-500 mb-2">
                   Создан: {new Date(quiz.created_at || Date.now()).toLocaleDateString()}
+                </div>
+                <div className="text-sm text-gray-500 mb-4">
+                  👥 Участников: {participantCount[quiz.id!] || 0}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="success" onClick={() => quiz.id && handleRun(quiz.id)}>

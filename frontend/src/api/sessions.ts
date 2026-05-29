@@ -41,5 +41,8 @@ export const sessionsApi = {
     api.get(`/api/organizer/sessions/${sessionId}/results/`),
 
   getQuestionsStats: (sessionId: number) =>
-    api.get(`/api/organizer/sessions/${sessionId}/questions_stats/`)
+    api.get(`/api/organizer/sessions/${sessionId}/questions_stats/`),
+
+  checkCompleted: (sessionId: number) =>
+    api.get(`/api/organizer/sessions/${sessionId}/check_completed/`)
 }

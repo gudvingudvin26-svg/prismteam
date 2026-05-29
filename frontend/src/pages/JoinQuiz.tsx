@@ -26,12 +26,14 @@ const JoinQuiz: React.FC = () => {
     try {
       const response = await sessionsApi.joinSession(code.toUpperCase(), nickname);
       const sessionId = response.data.session_id;
-      navigate(`/play/${sessionId}`);
+      navigate(`/play/${sessionId}`, { replace: true });
     } catch (err: any) {
       const status = err.response?.status;
       const data = err.response?.data;
       if (status === 404) {
         setError('Сессия с таким кодом не найдена');
+      } else if (status === 400 && data?.error === 'Вы уже проходили этот квиз') {
+        setError('Вы уже проходили этот квиз');
       } else {
         setError(data?.error || 'Ошибка подключения к сессии');
       }

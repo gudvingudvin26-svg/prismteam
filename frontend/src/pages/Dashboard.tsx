@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui';
-import { quizzesApi } from '../api';
+import { quizzesApi, sessionsApi } from '../api';
 import { Quiz } from '../types';
 import { useAppStore } from '../store/appStore';
 
@@ -26,9 +26,26 @@ const Dashboard: React.FC = () => {
         const response = await quizzesApi.getMyQuizzes();
         const myQuizzes = response.data;
         setQuizzes(myQuizzes);
+
+        let totalParticipants = 0;
+        for (const quiz of myQuizzes) {
+          try {
+            const sessionsRes = await sessionsApi.getSessionsForQuiz(quiz.id!);
+            const uniqueParticipants = new Set();
+            for (const session of sessionsRes.data) {
+              if (session.participant_name && session.is_completed) {
+                uniqueParticipants.add(session.participant_name);
+              }
+            }
+            totalParticipants += uniqueParticipants.size;
+          } catch (e) {
+            console.error('Error fetching sessions for quiz', quiz.id, e);
+          }
+        }
+
         setStats({
           totalQuizzes: myQuizzes.length,
-          totalParticipants: 0,
+          totalParticipants: totalParticipants,
         });
       } catch (err: unknown) {
         console.error('Ошибка загрузки квизов:', err);
