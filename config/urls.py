@@ -6,7 +6,7 @@ from rest_framework.routers import DefaultRouter
 from app_modules.quiz.views import (
     UserRegistration, UserLogin, UserLogout, Main,
     QuizViewSet, QuestionViewSet, AnswerOptionViewSet,
-    UserRegistrationAPI, UserLoginAPI, GetCurrentUserAPI
+    UserRegistrationAPI, UserLoginAPI, GetCurrentUserAPI, TokenRefreshAPI
 )
 from app_modules.quiz_sessions.views import QuizSessionViewSet
 
@@ -24,12 +24,11 @@ urlpatterns = [
     path('main/', Main.as_view(), name='main'),
     path('logout/', UserLogout.as_view(), name='logout'),
 
-    path('auth/register/', UserRegistrationAPI.as_view(), name='auth_register'),
-    path('auth/login/', UserLoginAPI.as_view(), name='auth_login'),
     path('api/auth/register/', UserRegistrationAPI.as_view(), name='api_register'),
     path('api/auth/login/', UserLoginAPI.as_view(), name='api_login'),
     path('api/auth/me/', GetCurrentUserAPI.as_view(), name='auth_me'),
-    path('api/organizer/', include(router.urls)),
+    path('api/auth/refresh/', TokenRefreshAPI.as_view(), name='api_refresh'),
 
+    path('api/organizer/', include(router.urls)),
     path('api/sessions/join/', include('app_modules.quiz_sessions.urls')),
 ]

@@ -4,31 +4,23 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post('/api/auth/login/', { email, password }),
 
-  register: (username: string, email: string, password: string, password2: string) =>
+  register: (username: string, email: string, password: string, confirmPassword: string) =>
     api.post('/api/auth/register/', {
       username: username,
       email: email,
       password: password,
-      again_password: password2,
+      again_password: confirmPassword,
       first_name: username
     }),
-
-  refresh: (refresh: string) =>
-    api.post('/api/auth/refresh/', { refresh }),
-
-  getProfile: () =>
-    api.get('/api/auth/profile/'),
 
   getCurrentUser: () =>
     api.get('/api/auth/me/'),
 
-  saveTokens: (access: string, refresh: string) => {
-    localStorage.setItem('accessToken', access)
-    localStorage.setItem('refreshToken', refresh)
-  },
-
-  logout: () => {
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
+  logout: async () => {
+    try {
+      await api.post('/logout/');
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
   }
 }

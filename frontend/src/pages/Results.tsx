@@ -34,6 +34,7 @@ const Results: React.FC = () => {
   const [questionsStats, setQuestionsStats] = useState<QuestionStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
+  const [quizId, setQuizId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -47,6 +48,7 @@ const Results: React.FC = () => {
         ]);
 
         setMyResult(myRes.data);
+        setQuizId(sessionRes.data.quiz?.id || null);
 
         if (Array.isArray(leaderRes.data)) {
           setLeaderboard(leaderRes.data);
@@ -77,25 +79,48 @@ const Results: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
       <div className="max-w-4xl mx-auto bg-white/90 backdrop-blur-sm rounded-lg shadow-xl p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <h1 className="text-2xl font-bold text-gray-900">Результаты</h1>
-          {isOwner && (
-            <Link to="/dashboard">
-              <Button variant="primary">Панель управления</Button>
+          <div className="flex gap-3 flex-wrap">
+            {isOwner && (
+              <>
+                <Link to="/dashboard">
+                  <Button variant="primary" className="!text-black bg-white hover:bg-gray-100">
+                    📊 Панель управления
+                  </Button>
+                </Link>
+                {quizId && (
+                  <Link to={`/stats?quiz=${quizId}`}>
+                    <Button variant="outline" className="!text-black bg-white hover:bg-gray-100">
+                      📈 Статистика квиза
+                    </Button>
+                  </Link>
+                )}
+              </>
+            )}
+            <Link to="/">
+              <Button variant="outline" className="!text-black bg-white hover:bg-gray-100">
+                🏠 На главную
+              </Button>
             </Link>
-          )}
+            <Link to="/join">
+              <Button variant="outline" className="!text-black bg-white hover:bg-gray-100">
+                🎮 Играть снова
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {myResult && (
-          <Card className="p-6 mb-8 text-center bg-blue-50">
+          <Card className="p-6 mb-8 text-center bg-gradient-to-r from-blue-50 to-purple-50">
             <h2 className="text-xl font-semibold mb-2">Ваш результат</h2>
             <p className="text-3xl font-bold text-blue-600">{myResult.score} баллов</p>
-            <p>Правильных ответов: {myResult.correct_answers}</p>
-            <p>Место: {myResult.rank}</p>
+            <p className="mt-2">Правильных ответов: {myResult.correct_answers} из {myResult.total_questions}</p>
+            <p className="text-lg font-semibold mt-2">Место: #{myResult.rank}</p>
           </Card>
         )}
 
-        <h2 className="text-xl font-semibold mb-4">Таблица лидеров</h2>
+        <h2 className="text-xl font-semibold mb-4">🏆 Таблица лидеров</h2>
         <Card className="p-0 overflow-hidden mb-8">
           <table className="w-full">
             <thead className="bg-gray-100">
@@ -107,10 +132,10 @@ const Results: React.FC = () => {
             </thead>
             <tbody>
               {leaderboard.map((p, idx) => (
-                <tr key={idx} className="border-t">
-                  <td className="p-3">{p.rank || idx + 1}</td>
+                <tr key={idx} className="border-t hover:bg-gray-50">
+                  <td className="p-3 font-bold">#{p.rank || idx + 1}</td>
                   <td className="p-3">{p.participant_name || 'Без имени'}</td>
-                  <td className="p-3">{p.score}</td>
+                  <td className="p-3 font-semibold text-blue-600">{p.score}</td>
                 </tr>
               ))}
               {leaderboard.length === 0 && (
@@ -122,35 +147,27 @@ const Results: React.FC = () => {
           </table>
         </Card>
 
-        <h2 className="text-xl font-semibold mb-4">Статистика по вопросам</h2>
-        <div className="space-y-3">
-          {questionsStats.map((stat, idx) => (
-            <Card key={stat.question_id || idx} className="p-4">
-              <p className="font-medium">{stat.question_text}</p>
-              <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
-                <div
-                  className="bg-green-500 h-4 rounded-full"
-                  style={{ width: `${stat.correct_percent}%` }}
-                ></div>
-              </div>
-              <p className="text-sm text-gray-600 mt-1">
-                {stat.correct_count} из {stat.total_answers} правильных ({stat.correct_percent}%)
-              </p>
-            </Card>
-          ))}
-          {questionsStats.length === 0 && (
-            <p className="text-center text-gray-500">Нет статистики по вопросам</p>
-          )}
-        </div>
-
-        <div className="mt-8 flex gap-4 justify-center">
-          <Link to="/join">
-            <Button variant="outline">Играть снова</Button>
-          </Link>
-          <Link to="/">
-            <Button variant="outline">На главную</Button>
-          </Link>
-        </div>
+        {questionsStats.length > 0 && (
+          <>
+            <h2 className="text-xl font-semibold mb-4">📊 Статистика по вопросам</h2>
+            <div className="space-y-3">
+              {questionsStats.map((stat, idx) => (
+                <Card key={stat.question_id || idx} className="p-4">
+                  <p className="font-medium">{stat.question_text}</p>
+                  <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
+                    <div
+                      className="bg-green-500 h-4 rounded-full transition-all duration-500"
+                      style={{ width: `${stat.correct_percent}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {stat.correct_count} из {stat.total_answers} правильных ({stat.correct_percent}%)
+                  </p>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

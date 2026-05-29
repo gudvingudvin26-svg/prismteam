@@ -114,6 +114,8 @@ def validate_answer_options_data(
                 f"{MIN_OPTIONS_COUNT_MULTIPLE} варианта ответа."
             )
 
+    answer_texts = set()
+    for index, opt in enumerate(options_data):
         raise ExceptionClass(
             f"Вопрос должен содержать минимум {MIN_OPTIONS_COUNT} варианта ответа."
         )
@@ -157,6 +159,11 @@ def validate_answer_options_data(
             raise ExceptionClass(
                 "Для одиночного выбора должен быть ровно один правильный ответ."
             )
+        normalized_text = option_text.strip().lower()
+        if normalized_text in answer_texts:
+            raise ExceptionClass(f"Вариант ответа #{index + 1} дублируется: '{option_text}'")
+        answer_texts.add(normalized_text)
+
 
         if question_type == 'multiple' and correct_count < 2:
             raise ExceptionClass(
@@ -215,6 +222,14 @@ def validate_quiz_integrity(
                 f"Текст вопроса '{question_text[:30]}' содержит бессмысленный или некорректный текст."
             )
 
+        answer_texts = set()
+        for answer in answers:
+            normalized = answer.text.strip().lower()
+            if normalized in answer_texts:
+                raise ExceptionClass(f"В вопросе '{question.text[:30]}' обнаружен дубликат ответа: '{answer.text}'")
+            answer_texts.add(normalized)
+
+        correct_count = sum(1 for a in answers if a.is_correct)
         answers = list(question.answer_options.all())
 
         required_options_count = (
@@ -257,6 +272,8 @@ def validate_quiz_integrity(
         if question.question_type == 'single':
             if correct_count != 1:
                 raise ExceptionClass(
+                    f"В вопросе '{question.text[:30]}' для одиночного выбора должен быть ровно один правильный ответ (сейчас: {correct_count}).")
+                raise ExceptionClass(
                     f"В вопросе '{question_text[:30]}' "
                     f"для одиночного выбора должен быть ровно один "
                     f"правильный ответ (сейчас: {correct_count})."
@@ -264,6 +281,20 @@ def validate_quiz_integrity(
 
 
         elif question.question_type == 'multiple':
+            if correct_count < 1:
+                raise ExceptionClass(
+                    f"В вопросе '{question.text[:30]}' для множественного выбора должен быть хотя бы один правильный ответ (сейчас: {correct_count}).")
+            if correct_count == len(answers):
+                raise ExceptionClass(
+                    f"В вопросе '{question.text[:30]}' нельзя отмечать ВСЕ варианты как правильные для множественного выбора.")
+
+
+def validate_unique_answers_per_question(question):
+    answers = question.answer_options.all()
+    texts = [a.text.strip().lower() for a in answers]
+    duplicates = [text for text in texts if texts.count(text) > 1]
+    if duplicates:
+        raise DjangoValidationError(f"В вопросе обнаружены дублирующиеся ответы: {set(duplicates)}")
             if correct_count < 2:
                 raise ExceptionClass(
                     f"В вопросе '{question_text[:30]}' "

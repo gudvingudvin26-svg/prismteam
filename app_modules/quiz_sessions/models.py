@@ -10,15 +10,18 @@ class QuizSession(models.Model):
     ]
 
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='sessions')
-    code = models.CharField(max_length=6, unique=False)
-    participant_name = models.CharField(max_length=100, blank=True, null=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='waiting')
+    code = models.CharField(max_length=10, db_index=True)
+    participant_name = models.CharField(max_length=200, blank=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='waiting', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'quiz_session'
+        indexes = [
+            models.Index(fields=['code', 'status']),
+        ]
 
     def __str__(self):
         return f"{self.quiz.title} - {self.code} ({self.participant_name})"
@@ -33,6 +36,9 @@ class ParticipantAnswer(models.Model):
 
     class Meta:
         db_table = 'participant_answer'
+        indexes = [
+            models.Index(fields=['session', 'question']),
+        ]
 
     def __str__(self):
         return f"{self.session.code} - Q{self.question.id}: {self.is_correct}"

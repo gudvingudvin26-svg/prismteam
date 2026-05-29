@@ -1,7 +1,5 @@
 import logging
-
 from rest_framework import serializers
-
 from .models import User, Question, AnswerOption, Quiz
 from .validators import (
     validate_answer_options_data,
@@ -42,6 +40,10 @@ class QuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Question
+        fields = ['id', 'quiz', 'text', 'order', 'question_type', 'timer', 'points', 'answer_options']
+        extra_kwargs = {
+            'quiz': {'required': False}
+        }
         fields = [
             'id',
             'quiz',
@@ -121,6 +123,7 @@ class QuestionSerializer(serializers.ModelSerializer):
         quiz_log.info(
             'Organizer updated question in the quiz successfully'
         )
+        quiz_log.info('Организатор успешно обновил вопрос в квизе')
         return instance
 
 

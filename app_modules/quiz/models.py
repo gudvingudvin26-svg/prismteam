@@ -1,15 +1,19 @@
-import secrets
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import MinLengthValidator, RegexValidator
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.core.validators import MinLengthValidator
-from django.core.exceptions import ValidationError
-
+import secrets
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=13, blank=True, null=True, unique=True)
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        unique=True,
+        validators=[RegexValidator(r'^\+?1?\d{9,15}$', 'Неверный формат телефона')]
+    )
 
     groups = models.ManyToManyField(
         'auth.Group',
@@ -25,27 +29,28 @@ class User(AbstractUser):
     def __str__(self):
         return self.username
 
-
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile', primary_key=True)
-    info = models.TextField(max_length=600, blank=True)
+    info = models.TextField(max_length=1000, blank=True)
 
     def __str__(self):
         return f'Profile of {self.user.username}'
-
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
 
-
 def generate_token():
     return secrets.token_urlsafe(16)[:16]
 
-
 class Quiz(models.Model):
-    title = models.CharField(max_length=100, verbose_name="Название")
+    title = models.CharField(
+        max_length=200,
+        verbose_name="Название",
+        db_index=True,
+        validators=[MinLengthValidator(3)]
+    )
     description = models.TextField(blank=True, null=True, verbose_name="Описание")
     created_by = models.ForeignKey(
         User,
@@ -57,14 +62,14 @@ class Quiz(models.Model):
         max_length=64,
         unique=True,
         default=generate_token,
-        verbose_name="Токен доступа"
+        verbose_name="Токен доступа",
+        db_index=True
     )
     timer = models.IntegerField(blank=True, null=True, verbose_name="Таймер в секундах")
     points_per_question = models.IntegerField(default=100, verbose_name="Баллов за правильный ответ")
 
     def __str__(self):
         return self.title
-
 
 class Question(models.Model):
     QUESTION_TYPE_CHOICES = [
@@ -78,12 +83,7 @@ class Question(models.Model):
         related_name='questions',
         verbose_name="Викторина"
     )
-    text = models.TextField(
-        verbose_name="Текст вопроса",
-        validators=[MinLengthValidator(5, message="Вопрос слишком короткий (минимум 5 символов)")],
-        blank=False,
-        null=False
-    )
+    text = models.TextField(verbose_name="Текст вопроса")
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     question_type = models.CharField(
         max_length=10,
@@ -97,13 +97,8 @@ class Question(models.Model):
     class Meta:
         ordering = ['quiz', 'order']
 
-    def clean(self):
-        if self.text and not self.text.strip():
-            raise ValidationError({'text': "Текст вопроса не может состоять только из пробелов."})
-
     def __str__(self):
-        return f"{self.quiz.title} - {self.text[:50] if len(self.text) > 50 else self.text}"
-
+        return f"{self.quiz.title} - {self.text[:50]}"
 
 class AnswerOption(models.Model):
     question = models.ForeignKey(
@@ -112,7 +107,7 @@ class AnswerOption(models.Model):
         related_name='answer_options',
         verbose_name="Вопрос"
     )
-    text = models.CharField(max_length=300, verbose_name="Текст ответа")
+    text = models.CharField(max_length=500, verbose_name="Текст ответа")
     is_correct = models.BooleanField(default=False, verbose_name="Правильный ответ")
 
     def __str__(self):

@@ -4,10 +4,29 @@ from channels.db import database_sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from .redis_utils import get_timer_manager
 from .observer import game_observer
+import logging
+
+logger = logging.getLogger('ws')
 
 
 class QuizConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        from rest_framework_simplejwt.tokens import AccessToken
+        from django.contrib.auth import get_user_model
+
+        token = self.scope['query_string'].decode().split('=')[-1] if '=' in self.scope[
+            'query_string'].decode() else None
+
+        if token:
+            user = await self.get_user_from_token(token)
+            if not user:
+                await self.close()
+                return
+            self.scope['user'] = user
+        else:
+            await self.close()
+            return
+
         self.quiz_id = self.scope['url_route']['kwargs'].get('quiz_id', 'global')
         self.room_group_name = f'quiz_{self.quiz_id}'
         self.timer_manager = get_timer_manager()
@@ -19,7 +38,6 @@ class QuizConsumer(AsyncWebsocketConsumer):
         )
         await self.accept()
 
-        # Подписываемся на игровые события через Observer
         self._on_question_started = lambda **kwargs: self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -89,6 +107,19 @@ class QuizConsumer(AsyncWebsocketConsumer):
                 'type': 'error',
                 'message': 'Invalid JSON'
             }))
+
+    @database_sync_to_async
+    def get_user_from_token(self, token):
+        from rest_framework_simplejwt.tokens import AccessToken
+        from django.contrib.auth import get_user_model
+
+        try:
+            access_token = AccessToken(token)
+            user_id = access_token['user_id']
+            User = get_user_model()
+            return User.objects.get(id=user_id)
+        except Exception:
+            return None
 
     def _get_display_name(self) -> str:
         user = self.scope.get('user')
@@ -170,7 +201,6 @@ class QuizConsumer(AsyncWebsocketConsumer):
         duration = await self._get_quiz_timer_duration()
         self.timer_manager.start_question_timer(self.quiz_id, question_number=next_num, duration=duration)
 
-        # Оповещаем Observer о начале нового вопроса
         game_observer.notify('question_started', question_number=next_num, timer=duration)
 
         await self.channel_layer.group_send(
@@ -248,7 +278,6 @@ class QuizConsumer(AsyncWebsocketConsumer):
             for name, score in sorted_scores[:10]
         ]
 
-    # Существующие обработчики событий
     async def user_joined(self, event):
         await self.send(text_data=json.dumps({
             'type': 'user_joined',
@@ -291,7 +320,6 @@ class QuizConsumer(AsyncWebsocketConsumer):
             'message': event['message']
         }))
 
-    # Новые обработчики для Observer
     async def question_started_event(self, event):
         await self.send(text_data=json.dumps({
             'type': 'question_started',

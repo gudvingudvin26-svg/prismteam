@@ -37,26 +37,27 @@ const EditQuiz: React.FC = () => {
       try {
         const response = await quizzesApi.getQuiz(parseInt(id));
         const quizData = response.data;
-        setTitle(quizData.title);
+        setTitle(quizData.title || '');
         setDescription(quizData.description || '');
         setGlobalTimer(quizData.timer);
         setGlobalPoints(quizData.points_per_question || 100);
 
         if (quizData.questions && Array.isArray(quizData.questions)) {
           const sortedQuestions = [...quizData.questions].sort((a, b) => a.order - b.order);
-          setQuestions(sortedQuestions.map((q: any) => ({
+          const formattedQuestions = sortedQuestions.map((q: any) => ({
             id: q.id,
-            text: q.text,
+            text: q.text || '',
             timer: q.timer,
             points: q.points,
             order: q.order,
             question_type: q.question_type || 'single',
-            answers: q.answer_options.map((a: any) => ({
+            answers: (q.answer_options || []).map((a: any) => ({
               id: a.id,
-              text: a.text,
-              is_correct: a.is_correct,
+              text: a.text || '',
+              is_correct: a.is_correct || false,
             })),
-          })));
+          }));
+          setQuestions(formattedQuestions);
         }
       } catch (err) {
         console.error(err);
@@ -67,6 +68,49 @@ const EditQuiz: React.FC = () => {
     };
     fetchQuiz();
   }, [id]);
+
+  const validate = (): string => {
+    if (questions.length < 2) return 'Добавьте хотя бы два вопроса';
+    if (!title.trim()) return 'Введите название квиза';
+
+    if (globalTimer && globalTimer > 0) {
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        if (q.timer && q.timer > globalTimer) {
+          return `Вопрос ${i + 1}: таймер вопроса (${q.timer} сек) не может превышать таймер всего квиза (${globalTimer} сек)`;
+        }
+      }
+    }
+
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.text.trim()) return `Вопрос ${i + 1}: введите текст вопроса`;
+      if (q.answers.length < 2) return `Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`;
+
+      let hasCorrect = false;
+      const answerTexts = new Set();
+      for (let j = 0; j < q.answers.length; j++) {
+        if (!q.answers[j].text.trim()) return `Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`;
+        const normalizedText = q.answers[j].text.trim().toLowerCase();
+        if (answerTexts.has(normalizedText)) return `Вопрос ${i + 1}: вариант "${q.answers[j].text}" повторяется`;
+        answerTexts.add(normalizedText);
+        if (q.answers[j].is_correct) hasCorrect = true;
+      }
+      if (!hasCorrect) return `Вопрос ${i + 1}: выберите правильный вариант`;
+
+      if (q.question_type === 'multiple') {
+        const correctCount = q.answers.filter(a => a.is_correct).length;
+        if (correctCount === q.answers.length) return `Вопрос ${i + 1}: нельзя отмечать ВСЕ варианты как правильные`;
+      }
+    }
+    return '';
+  };
+
+  const updateQuestion = (index: number, field: string, value: any) => {
+    const newQuestions = [...questions];
+    newQuestions[index] = { ...newQuestions[index], [field]: value };
+    setQuestions(newQuestions);
+  };
 
   const addQuestion = () => {
     setQuestions([...questions, {
@@ -79,8 +123,8 @@ const EditQuiz: React.FC = () => {
   };
 
   const removeQuestion = (index: number) => {
-    if (questions.length === 1) {
-      setError('Должен быть хотя бы один вопрос');
+    if (questions.length <= 2) {
+      setError('Должно быть минимум 2 вопроса');
       return;
     }
     const newQuestions = [...questions];
@@ -105,40 +149,6 @@ const EditQuiz: React.FC = () => {
     }
   };
 
-  const updateQuestionText = (qIndex: number, text: string) => {
-    const newQuestions = [...questions];
-    newQuestions[qIndex].text = text;
-    setQuestions(newQuestions);
-  };
-
-  const updateQuestionTimer = (qIndex: number, timer: number | undefined) => {
-    const newQuestions = [...questions];
-    newQuestions[qIndex].timer = timer;
-    setQuestions(newQuestions);
-  };
-
-  const updateQuestionPoints = (qIndex: number, points: number) => {
-    const newQuestions = [...questions];
-    newQuestions[qIndex].points = points;
-    setQuestions(newQuestions);
-  };
-
-  const updateQuestionType = (qIndex: number, question_type: string) => {
-    const newQuestions = [...questions];
-    newQuestions[qIndex].question_type = question_type;
-    if (
-      question_type === 'multiple' &&
-      newQuestions[qIndex].answers.length < 3
-    ) {
-      newQuestions[qIndex].answers.push({
-        text: '',
-        is_correct: false,
-      });
-  }
-
-  setQuestions(newQuestions);
-};
-
   const addAnswer = (qIndex: number) => {
     const newQuestions = [...questions];
     newQuestions[qIndex].answers.push({ text: '', is_correct: false });
@@ -147,18 +157,17 @@ const EditQuiz: React.FC = () => {
 
   const removeAnswer = (qIndex: number, aIndex: number) => {
     const newQuestions = [...questions];
-
-    const minAnswers = newQuestions[qIndex].question_type === 'multiple'
-      ? 3
-      : 2;
-
-    if (newQuestions[qIndex].answers.length <= minAnswers) {
-      setError(
-    `У вопроса должно быть минимум ${minAnswers} варианта ответа`);
+    if (newQuestions[qIndex].answers.length <= 2) {
+      setError('У вопроса должно быть минимум 2 варианта');
       return;
     }
-
     newQuestions[qIndex].answers.splice(aIndex, 1);
+    if (newQuestions[qIndex].question_type === 'single') {
+      const hasCorrect = newQuestions[qIndex].answers.some(a => a.is_correct);
+      if (!hasCorrect && newQuestions[qIndex].answers.length > 0) {
+        newQuestions[qIndex].answers[0].is_correct = true;
+      }
+    }
     setQuestions(newQuestions);
     setError('');
   };
@@ -183,116 +192,15 @@ const EditQuiz: React.FC = () => {
     setQuestions(newQuestions);
   };
 
-  const validate = (): boolean => {
-  if (!title.trim()) {
-    setError('Введите название квиза');
-    return false;
-  }
-
-  if (questions.length < 2) {
-    setError('Квиз должен содержать минимум 2 вопроса');
-    return false;
-  }
-
-  if (globalTimer !== undefined && globalTimer <= 0) {
-    setError('Таймер квиза должен быть больше 0');
-    return false;
-  }
-
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-
-    if (!q.text.trim()) {
-      setError(`Вопрос ${i + 1}: введите текст вопроса`);
-      return false;
-    }
-
-    if (q.text.trim().length < 5) {
-      setError(`Вопрос ${i + 1}: текст слишком короткий`);
-      return false;
-    }
-
-    if (q.timer !== undefined && q.timer <= 0) {
-      setError(`Вопрос ${i + 1}: таймер должен быть больше 0`);
-      return false;
-    }
-
-    if (q.points !== undefined && q.points <= 0) {
-      setError(`Вопрос ${i + 1}: количество баллов должно быть больше 0`);
-      return false;
-    }
-
-    if (q.question_type === 'multiple') {
-      if (q.answers.length < 3) {
-        setError(
-          `Вопрос ${i + 1}: для множественного выбора нужно минимум 3 варианта ответа`
-        );
-        return false;
-      }
-    } else {
-      if (q.answers.length < 2) {
-        setError(
-          `Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`
-        );
-        return false;
-      }
-    }
-
-    let correctCount = 0;
-
-    for (let j = 0; j < q.answers.length; j++) {
-      const answer = q.answers[j];
-
-      if (!answer.text.trim()) {
-        setError(
-          `Вопрос ${i + 1}: вариант ${j + 1} не может быть пустым`
-        );
-        return false;
-      }
-
-      if (answer.text.trim().length < 1) {
-        setError(
-          `Вопрос ${i + 1}: вариант ${j + 1} слишком короткий`
-        );
-        return false;
-      }
-
-      if (answer.is_correct) {
-        correctCount++;
-      }
-    }
-
-    if (q.question_type === 'single') {
-      if (correctCount !== 1) {
-        setError(
-          `Вопрос ${i + 1}: для одиночного выбора должен быть ровно один правильный ответ`
-        );
-        return false;
-      }
-    }
-
-    if (q.question_type === 'multiple') {
-      if (correctCount < 2) {
-        setError(
-          `Вопрос ${i + 1}: для множественного выбора должно быть минимум 2 правильных ответа`
-        );
-        return false;
-      }
-
-      if (correctCount === q.answers.length) {
-        setError(
-          `Вопрос ${i + 1}: нельзя отмечать все варианты правильными`
-        );
-        return false;
-      }
-    }
-  }
-    setError('');
-    return true;
-  };
-
   const handleSubmit = async () => {
-    if (!validate() || !id) return;
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    if (!id) return;
+
     setSaving(true);
     setError('');
 
@@ -325,7 +233,17 @@ const EditQuiz: React.FC = () => {
       navigate('/quizzes');
     } catch (err: any) {
       console.error('Save error:', err);
-      setError('Ошибка при сохранении квиза');
+      if (err.response?.data) {
+        const errorData = err.response.data;
+        if (typeof errorData === 'object') {
+          const firstError = Object.values(errorData)[0];
+          setError(Array.isArray(firstError) ? firstError[0] : String(firstError));
+        } else {
+          setError(String(errorData));
+        }
+      } else {
+        setError('Ошибка при сохранении квиза');
+      }
     } finally {
       setSaving(false);
     }
@@ -341,9 +259,10 @@ const EditQuiz: React.FC = () => {
         <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-xl p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Редактирование квиза</h1>
-            <Button variant="outline" onClick={() => navigate(-1)} className="!text-black bg-white hover:bg-gray-100">
-              Назад
-            </Button>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => navigate('/quizzes')}>← Назад к квизам</Button>
+              <Button variant="primary" onClick={handleSubmit} isLoading={saving}>Сохранить изменения</Button>
+            </div>
           </div>
 
           <Card className="p-6 mb-6 bg-white shadow-md">
@@ -364,18 +283,24 @@ const EditQuiz: React.FC = () => {
               label="Таймер на весь квиз (секунды, опционально)"
               type="number"
               value={globalTimer || ''}
-              onChange={(e) => setGlobalTimer(e.target.value ? Number(e.target.value) : undefined)}
+              onChange={(e) => {
+                const value = e.target.value ? Number(e.target.value) : undefined;
+                setGlobalTimer((value !== undefined && value <= 0) ? undefined : value);
+              }}
+              min="1"
+              step="1"
             />
             <Input
               label="Баллов за правильный ответ (по умолчанию)"
               type="number"
               value={globalPoints}
               onChange={(e) => setGlobalPoints(Number(e.target.value))}
+              min="1"
             />
           </Card>
 
           {questions.map((q, qIdx) => (
-            <Card key={qIdx} className="p-6 mb-6 bg-white shadow-md">
+            <Card key={q.id || qIdx} className="p-6 mb-6 bg-white shadow-md">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-semibold mb-4 text-gray-900">Вопрос {qIdx + 1}</h3>
@@ -402,12 +327,10 @@ const EditQuiz: React.FC = () => {
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Тип вопроса
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Тип вопроса</label>
                 <select
                   value={q.question_type}
-                  onChange={(e) => updateQuestionType(qIdx, e.target.value)}
+                  onChange={(e) => updateQuestion(qIdx, 'question_type', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
                 >
                   <option value="single">Одиночный выбор</option>
@@ -418,7 +341,7 @@ const EditQuiz: React.FC = () => {
               <Input
                 label="Текст вопроса"
                 value={q.text}
-                onChange={(e) => updateQuestionText(qIdx, e.target.value)}
+                onChange={(e) => updateQuestion(qIdx, 'text', e.target.value)}
                 required
               />
 
@@ -427,13 +350,24 @@ const EditQuiz: React.FC = () => {
                   label="Таймер на вопрос (секунды, опционально)"
                   type="number"
                   value={q.timer || ''}
-                  onChange={(e) => updateQuestionTimer(qIdx, e.target.value ? Number(e.target.value) : undefined)}
+                  onChange={(e) => {
+                    const value = e.target.value ? Number(e.target.value) : undefined;
+                    if (globalTimer && value && value > globalTimer) {
+                      setError(`Таймер вопроса не может превышать таймер всего квиза (${globalTimer} сек)`);
+                    } else {
+                      setError('');
+                      updateQuestion(qIdx, 'timer', (value !== undefined && value <= 0) ? undefined : value);
+                    }
+                  }}
+                  min="1"
+                  step="1"
                 />
                 <Input
                   label="Баллов за вопрос"
                   type="number"
                   value={q.points || globalPoints}
-                  onChange={(e) => updateQuestionPoints(qIdx, Number(e.target.value))}
+                  onChange={(e) => updateQuestion(qIdx, 'points', Number(e.target.value))}
+                  min="1"
                 />
               </div>
 
@@ -442,7 +376,7 @@ const EditQuiz: React.FC = () => {
                   Варианты ответов {q.question_type === 'multiple' && '(можно выбрать несколько)'}
                 </label>
                 {q.answers.map((ans, aIdx) => (
-                  <div key={aIdx} className="flex items-center gap-2 mb-2">
+                  <div key={ans.id || aIdx} className="flex items-center gap-2 mb-2">
                     <input
                       type={q.question_type === 'multiple' ? 'checkbox' : 'radio'}
                       name={`correct-${qIdx}`}
@@ -469,7 +403,7 @@ const EditQuiz: React.FC = () => {
             <Button variant="primary" onClick={handleSubmit} isLoading={saving}>Сохранить изменения</Button>
           </div>
 
-          {error && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
+          {error && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded whitespace-pre-wrap">{error}</div>}
         </div>
       </div>
     </div>
