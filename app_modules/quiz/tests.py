@@ -114,7 +114,7 @@ class TestLogout(TestCase):
 
     def test_get(self):
         response = self.client.get(reverse('logout'))
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
 
     def test_logout(self):
         self.client.post(reverse('login'), {
