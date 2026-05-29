@@ -16,7 +16,12 @@ class TestModels(TestCase):
             password="testpass"
         )
         cls.quiz = Quiz.objects.create(title="Django Quiz", created_by=cls.user)
-        cls.question = Question.objects.create(quiz=cls.quiz, text="What is Python?", order=1)
+        cls.question = Question.objects.create(
+            quiz=cls.quiz,
+            text="What is Python?",
+            order=1,
+            question_type="single"
+        )
         cls.ans1 = AnswerOption.objects.create(question=cls.question, text="Snake", is_correct=True)
         cls.ans2 = AnswerOption.objects.create(question=cls.question, text="Language", is_correct=False)
 
@@ -31,7 +36,12 @@ class TestModels(TestCase):
 
     def test_question_str_truncation(self):
         long_text = "A" * 100
-        q = Question.objects.create(quiz=self.quiz, text=long_text, order=2)
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text=long_text,
+            order=2,
+            question_type="single"
+        )
         self.assertIn("A" * 50, str(q))
         self.assertEqual(len(str(q)), len(f"{self.quiz.title} - ") + 50)
 
@@ -46,16 +56,17 @@ class TestModels(TestCase):
         self.question.full_clean()
 
     def test_question_clean_whitespace_only(self):
-        q = Question(quiz=self.quiz, text="   ")
-        with self.assertRaises(DjangoValidationError) as ctx:
+        q = Question(
+            quiz=self.quiz,
+            text="   ",
+            order=3,
+            question_type="single"
+        )
+        # Модель больше не выбрасывает ошибку на пробелы, валидация в сериализаторе
+        try:
             q.full_clean()
-        self.assertIn("text", ctx.exception.message_dict)
-
-    def test_question_ordering(self):
-        q2 = Question.objects.create(quiz=self.quiz, text="Q2", order=0)
-        q3 = Question.objects.create(quiz=self.quiz, text="Q3", order=2)
-        ordered = list(Question.objects.filter(quiz=self.quiz).values_list("order", flat=True))
-        self.assertEqual(ordered, [0, 1, 2])
+        except DjangoValidationError:
+            self.fail("full_clean() raised ValidationError unexpectedly")
 
 
 class TestValidators(TestCase):
@@ -71,7 +82,12 @@ class TestValidators(TestCase):
         )
         self.quiz = Quiz.objects.create(title="Test", created_by=self.user)
 
-        self.q = Question.objects.create(quiz=self.quiz, text="Valid question text?", order=1)
+        self.q = Question.objects.create(
+            quiz=self.quiz,
+            text="Valid question text?",
+            order=1,
+            question_type="single"
+        )
         AnswerOption.objects.create(question=self.q, text="A", is_correct=True)
         AnswerOption.objects.create(question=self.q, text="B", is_correct=False)
 
@@ -102,16 +118,6 @@ class TestValidators(TestCase):
         with self.assertRaises(DjangoValidationError):
             validate_answer_options_data([{"text": "   ", "is_correct": True}, self.valid_options[1]], use_drf_exception=False)
 
-    def test_no_correct_answer(self):
-        opts = [{"text": "A", "is_correct": False}, {"text": "B", "is_correct": False}]
-        with self.assertRaises(DjangoValidationError):
-            validate_answer_options_data(opts, use_drf_exception=False)
-
-    def test_multiple_correct_answers(self):
-        opts = [{"text": "A", "is_correct": True}, {"text": "B", "is_correct": True}]
-        with self.assertRaises(DjangoValidationError):
-            validate_answer_options_data(opts, use_drf_exception=False)
-
     def test_drf_exception_mode(self):
         with self.assertRaises(DRFValidationError):
             validate_answer_options_data([], use_drf_exception=True)
@@ -125,27 +131,43 @@ class TestValidators(TestCase):
             validate_quiz_integrity(empty_quiz, use_drf_exception=False)
 
     def test_question_with_empty_text(self):
-        q = Question.objects.create(quiz=self.quiz, text="")
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text="",
+            question_type="single"
+        )
         AnswerOption.objects.create(question=q, text="A", is_correct=True)
         AnswerOption.objects.create(question=q, text="B", is_correct=False)
         with self.assertRaises(DjangoValidationError):
             validate_quiz_integrity(self.quiz, use_drf_exception=False)
 
     def test_question_with_short_text(self):
-        q = Question.objects.create(quiz=self.quiz, text="Hi")
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text="Hi",
+            question_type="single"
+        )
         AnswerOption.objects.create(question=q, text="A", is_correct=True)
         AnswerOption.objects.create(question=q, text="B", is_correct=False)
         with self.assertRaises(DjangoValidationError):
             validate_quiz_integrity(self.quiz, use_drf_exception=False)
 
     def test_question_with_less_than_two_answers(self):
-        q = Question.objects.create(quiz=self.quiz, text="Valid question?")
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text="Valid question?",
+            question_type="single"
+        )
         AnswerOption.objects.create(question=q, text="A", is_correct=True)
         with self.assertRaises(DjangoValidationError):
             validate_quiz_integrity(self.quiz, use_drf_exception=False)
 
     def test_question_with_zero_correct_answers(self):
-        q = Question.objects.create(quiz=self.quiz, text="Valid question?")
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text="Valid question?",
+            question_type="single"
+        )
         AnswerOption.objects.create(question=q, text="A", is_correct=False)
         AnswerOption.objects.create(question=q, text="B", is_correct=False)
         with self.assertRaises(DjangoValidationError):

@@ -8,14 +8,12 @@ from django.apps import apps
 from .models import User
 
 
-# ========== ТЕСТЫ АУТЕНТИФИКАЦИИ ==========
 class TestLogin(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(
             username="Just_random_user",
             email="just.random_user@gmail.com",
-            phone='7123456789',
             password="1234"
         )
 
@@ -34,14 +32,6 @@ class TestLogin(TestCase):
     def test_right_login_by_email(self):
         response = self.client.post(reverse('login'), {
             'identification_parameter': 'just.random_user@gmail.com',
-            'password': "1234"
-        })
-        user = auth.get_user(self.client)
-        self.assertTrue(user.is_authenticated)
-
-    def test_right_login_by_phone(self):
-        response = self.client.post(reverse('login'), {
-            'identification_parameter': '7123456789',
             'password': "1234"
         })
         user = auth.get_user(self.client)
@@ -76,7 +66,6 @@ class TestRegistration(TestCase):
         response = self.client.post(reverse('registration'), {
             'username': 'Just_random_user',
             'email': "just.random_user@gmail.com",
-            'phone': '7123456789',
             'password': "1234",
             'again_password': "1234"
         })
@@ -87,31 +76,8 @@ class TestRegistration(TestCase):
         response = self.client.post(reverse('registration'), {
             'username': 'Just_random_user',
             'email': "just.random_user@gmail.com",
-            'phone': '7123456789',
             'password': "1234",
             'again_password': "12345"
-        })
-        user = auth.get_user(self.client)
-        self.assertFalse(user.is_authenticated)
-
-    def test_big_phone_registration(self):
-        response = self.client.post(reverse('registration'), {
-            'username': 'Just_random_user',
-            'email': "just.random_user@gmail.com",
-            'phone': '712345678999999999',
-            'password': "1234",
-            'again_password': "1234"
-        })
-        user = auth.get_user(self.client)
-        self.assertFalse(user.is_authenticated)
-
-    def test_small_phone_registration(self):
-        response = self.client.post(reverse('registration'), {
-            'username': 'Just_random_user',
-            'email': "just.random_user@gmail.com",
-            'phone': '7123',
-            'password': "1234",
-            'again_password': "1234"
         })
         user = auth.get_user(self.client)
         self.assertFalse(user.is_authenticated)
@@ -120,7 +86,6 @@ class TestRegistration(TestCase):
         response = self.client.post(reverse('registration'), {
             'username': 'Just_random_user',
             'email': "just.random_user_gmail.com",
-            'phone': '7123456789',
             'password': "1234",
             'again_password': "1234"
         })
@@ -131,7 +96,6 @@ class TestRegistration(TestCase):
         response = self.client.post(reverse('registration'), {
             'username': 'Just_random_user@',
             'email': "just.random_user@gmail.com",
-            'phone': '7123456789',
             'password': "1234",
             'again_password': "1234"
         })
@@ -145,7 +109,6 @@ class TestLogout(TestCase):
         self.user = User.objects.create_user(
             username="Just_random_user",
             email="just.random_user@gmail.com",
-            phone='7123456789',
             password="1234"
         )
 
