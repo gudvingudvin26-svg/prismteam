@@ -85,23 +85,36 @@ const QuizSession: React.FC = () => {
 
   const handleSubmitAnswer = async () => {
     if (isAnswered) return;
-    if (selectedAnswers.length === 0) {
-      return;
-    }
-
     setIsAnswered(true);
 
     try {
       console.log('Submitting answer for question:', question?.id);
-      if (question?.question_type === 'multiple') {
-        await sessionsApi.submitMultipleAnswers(parseInt(sessionId!), question!.id, selectedAnswers);
+
+
+      if (selectedAnswers.length > 0) {
+
+        if (question?.question_type === 'multiple') {
+          await sessionsApi.submitMultipleAnswers(
+            parseInt(sessionId!),
+            question!.id,
+            selectedAnswers
+          );
+        } else {
+          await sessionsApi.submitAnswer(
+            parseInt(sessionId!),
+            question!.id,
+            selectedAnswers[0]
+          );
+        }
+
       } else {
-        await sessionsApi.submitAnswer(parseInt(sessionId!), question!.id, selectedAnswers[0]);
+        console.log('Time expired, no answer selected');
       }
 
       setTimeout(() => {
         loadQuestion(question!.index + 1);
       }, 500);
+
     } catch (error) {
       console.error('Error submitting answer:', error);
       setIsAnswered(false);
