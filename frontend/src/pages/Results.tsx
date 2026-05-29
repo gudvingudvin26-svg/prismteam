@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, Button } from '../components/ui';
 import { sessionsApi } from '../api';
 import { useAppStore } from '../store/appStore';
@@ -28,6 +28,7 @@ interface QuestionStat {
 
 const Results: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
   const user = useAppStore((state) => state.user);
   const [myResult, setMyResult] = useState<MyResult | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -74,6 +75,21 @@ const Results: React.FC = () => {
     fetchResults();
   }, [sessionId, user]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      if (sessionId) {
+        navigate(`/results/${sessionId}`, { replace: true });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    history.pushState(null, '', window.location.href);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [sessionId, navigate]);
+
   if (loading) return <div className="flex justify-center items-center h-screen text-white">Загрузка результатов...</div>;
 
   return (
@@ -101,11 +117,6 @@ const Results: React.FC = () => {
             <Link to="/">
               <Button variant="outline" className="!text-black bg-white hover:bg-gray-100">
                 🏠 На главную
-              </Button>
-            </Link>
-            <Link to="/join">
-              <Button variant="outline" className="!text-black bg-white hover:bg-gray-100">
-                🎮 Играть снова
               </Button>
             </Link>
           </div>

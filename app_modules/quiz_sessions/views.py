@@ -2,14 +2,14 @@ import random
 import string
 import logging
 import time
+from datetime import datetime
 from django.utils import timezone
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from .models import QuizSession, ParticipantAnswer
 from .serializers import QuizSessionSerializer
-from app_modules.quiz.observer import game_observer
+from app_modules.quiz.models import Quiz
 
 quiz_log = logging.getLogger('quiz_log')
 
@@ -18,7 +18,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSessionSerializer
 
     def get_permissions(self):
-        if self.action in ['join', 'retrieve', 'answer', 'my_result', 'results', 'questions_stats']:
+        if self.action in ['join', 'retrieve', 'answer', 'my_result', 'results', 'questions_stats', 'check_completed']:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
@@ -34,7 +34,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            from app_modules.quiz.models import Quiz
             quiz = Quiz.objects.filter(id=quiz_id, created_by=request.user).first()
             if not quiz:
                 return Response({'error': 'Квиз не найден'}, status=status.HTTP_404_NOT_FOUND)
@@ -60,19 +59,25 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         code = request.data.get('code')
         nickname = request.data.get('nickname')
 
-        print(f"=== JOIN SESSION ===")
-        print(f"Code: {code}")
-        print(f"Nickname: {nickname}")
-
         if not code or not nickname:
             return Response({'error': 'Code and nickname are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            master_session = QuizSession.objects.filter(code=code).first()
+            master_session = QuizSession.objects.filter(code=code, status__in=['waiting', 'active']).first()
             if not master_session:
-                return Response({'error': 'Сессия не найдена'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'Сессия не найдена или уже завершена'}, status=status.HTTP_404_NOT_FOUND)
 
-            existing_player = QuizSession.objects.filter(code=code, participant_name=nickname).first()
+            existing_completed = QuizSession.objects.filter(
+                quiz=master_session.quiz,
+                participant_name=nickname,
+                is_completed=True
+            ).first()
+
+            if existing_completed:
+                return Response({'error': 'Вы уже проходили этот квиз'}, status=status.HTTP_400_BAD_REQUEST)
+
+            existing_player = QuizSession.objects.filter(code=code, participant_name=nickname,
+                                                         is_completed=False).first()
             if existing_player:
                 return Response(
                     {'session_id': existing_player.id, 'code': existing_player.code,
@@ -83,17 +88,13 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 quiz=master_session.quiz,
                 code=master_session.code,
                 participant_name=nickname,
-                status='waiting',
-                started_at=timezone.now()
+                status='waiting'
             )
-
-            print(f"Player session created: id={player_session.id}, name={player_session.participant_name}")
 
             return Response(
                 {'session_id': player_session.id, 'code': player_session.code, 'quiz_title': player_session.quiz.title},
                 status=status.HTTP_200_OK)
         except Exception as e:
-            print(f"Error in join: {e}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
@@ -106,8 +107,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response({'status': 'started'})
         except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def end(self, request, pk=None):
@@ -115,15 +114,19 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session = QuizSession.objects.get(id=pk)
             session.status = 'completed'
             session.ended_at = timezone.now()
+            session.is_completed = True
             session.save()
-            print(f"Session {pk} completed successfully")
-            game_observer.notify('game_finished', session_id=session.id, code=session.code)
             return Response({'status': 'completed'})
         except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            print(f"Error ending session: {e}")
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
+    def check_completed(self, request, pk=None):
+        try:
+            session = QuizSession.objects.get(id=pk)
+            return Response({'is_completed': session.is_completed})
+        except QuizSession.DoesNotExist:
+            return Response({'is_completed': False})
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny()])
     def answer(self, request, pk=None):
@@ -131,6 +134,9 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if session.is_completed:
+            return Response({'error': 'Этот квиз уже пройден'}, status=status.HTTP_400_BAD_REQUEST)
 
         question_id = request.data.get('question_id')
         answer_ids = request.data.get('answer_ids', [])
@@ -229,7 +235,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
             total_questions = session.quiz.questions.count()
 
-            all_sessions = QuizSession.objects.filter(code=session.code)
+            all_sessions = QuizSession.objects.filter(code=session.code, is_completed=True)
             scores = {}
             for s in all_sessions:
                 points = 0
@@ -279,7 +285,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             return Response([], status=status.HTTP_404_NOT_FOUND)
 
         try:
-            all_sessions = QuizSession.objects.filter(code=session.code)
+            all_sessions = QuizSession.objects.filter(code=session.code, is_completed=True)
             players_summary = {}
 
             for s in all_sessions:
@@ -335,7 +341,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
         try:
             questions = session.quiz.questions.all()
             stats = []
-            related_sessions = QuizSession.objects.filter(code=session.code)
+            related_sessions = QuizSession.objects.filter(code=session.code, is_completed=True)
 
             for q in questions:
                 total_answers = ParticipantAnswer.objects.filter(session__in=related_sessions, question=q).count()
@@ -357,10 +363,11 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         try:
             session = QuizSession.objects.get(id=kwargs.get('pk'))
-            print(
-                f"Retrieve session {kwargs.get('pk')}, status: {session.status}, participant: {session.participant_name}")
         except QuizSession.DoesNotExist:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if session.is_completed:
+            return Response({'finished': True, 'is_completed': True})
 
         if session.participant_name:
             try:
@@ -368,14 +375,12 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 question_index = int(request.GET.get('index', 0))
                 questions_list = list(quiz.questions.all().order_by('order'))
 
-                print(f"Player session: question index {question_index}, total questions: {len(questions_list)}")
-
                 if question_index >= len(questions_list):
                     session.status = 'completed'
                     session.ended_at = timezone.now()
+                    session.is_completed = True
                     session.save()
-                    print(f"Player session {session.id} completed")
-                    return Response({'finished': True})
+                    return Response({'finished': True, 'is_completed': True})
 
                 current_question = questions_list[question_index]
                 timer_value = current_question.timer if current_question.timer else (quiz.timer if quiz.timer else 30)
@@ -389,7 +394,6 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                     'answers': [{'id': ans.id, 'text': ans.text} for ans in current_question.answer_options.all()]
                 })
             except Exception as e:
-                print(f"Error in player retrieve: {e}")
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         if not request.user.is_authenticated or session.quiz.created_by != request.user:
@@ -414,14 +418,12 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             question_index = int(request.GET.get('index', 0))
             questions_list = list(quiz.questions.all().order_by('order'))
 
-            print(f"Creator session: question index {question_index}, total questions: {len(questions_list)}")
-
             if question_index >= len(questions_list):
                 session.status = 'completed'
                 session.ended_at = timezone.now()
+                session.is_completed = True
                 session.save()
-                print(f"Creator session {session.id} completed")
-                return Response({'finished': True})
+                return Response({'finished': True, 'is_completed': True})
 
             current_question = questions_list[question_index]
             timer_value = current_question.timer if current_question.timer else (quiz.timer if quiz.timer else 30)
@@ -435,5 +437,4 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                 'answers': [{'id': ans.id, 'text': ans.text} for ans in current_question.answer_options.all()]
             })
         except Exception as e:
-            print(f"Error in creator retrieve: {e}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

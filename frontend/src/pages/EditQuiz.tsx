@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Input, Card } from '../components/ui';
-import { quizzesApi } from '../api';
+import { quizzesApi, sessionsApi } from '../api';
 
 interface AnswerForm {
   id?: number;
@@ -30,11 +30,21 @@ const EditQuiz: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [hasActiveSessions, setHasActiveSessions] = useState(false);
 
   useEffect(() => {
     const fetchQuiz = async () => {
       if (!id) return;
       try {
+        const sessionsRes = await sessionsApi.getSessionsForQuiz(parseInt(id));
+        const activeSessions = sessionsRes.data.some((s: any) => s.status === 'active');
+        if (activeSessions) {
+          setHasActiveSessions(true);
+          setError('Нельзя редактировать квиз, так как кто-то сейчас в него играет');
+          setLoading(false);
+          return;
+        }
+
         const response = await quizzesApi.getQuiz(parseInt(id));
         const quizData = response.data;
         setTitle(quizData.title || '');
@@ -69,21 +79,32 @@ const EditQuiz: React.FC = () => {
     fetchQuiz();
   }, [id]);
 
+  const validateTimer = (value: number | undefined): boolean => {
+    if (value === undefined) return true;
+    if (isNaN(value)) return false;
+    if (value <= 0) return false;
+    return true;
+  };
+
   const validate = (): string => {
     if (questions.length < 2) return 'Добавьте хотя бы два вопроса';
     if (!title.trim()) return 'Введите название квиза';
 
-    if (globalTimer && globalTimer > 0) {
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
-        if (q.timer && q.timer > globalTimer) {
-          return `Вопрос ${i + 1}: таймер вопроса (${q.timer} сек) не может превышать таймер всего квиза (${globalTimer} сек)`;
-        }
-      }
+    if (globalTimer !== undefined && (!validateTimer(globalTimer) || globalTimer <= 0)) {
+      return 'Таймер квиза должен быть положительным числом';
     }
 
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
+
+      if (q.timer !== undefined && (!validateTimer(q.timer) || q.timer <= 0)) {
+        return `Вопрос ${i + 1}: таймер должен быть положительным числом`;
+      }
+
+      if (globalTimer && globalTimer > 0 && q.timer && q.timer > globalTimer) {
+        return `Вопрос ${i + 1}: таймер вопроса (${q.timer} сек) не может превышать таймер всего квиза (${globalTimer} сек)`;
+      }
+
       if (!q.text.trim()) return `Вопрос ${i + 1}: введите текст вопроса`;
       if (q.answers.length < 2) return `Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`;
 
@@ -193,6 +214,11 @@ const EditQuiz: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (hasActiveSessions) {
+      setError('Нельзя редактировать квиз, так как кто-то сейчас в него играет');
+      return;
+    }
+
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -262,6 +288,18 @@ const EditQuiz: React.FC = () => {
     return <div className="min-h-screen flex items-center justify-center text-white">Загрузка...</div>;
   }
 
+  if (hasActiveSessions) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
+        <Card className="p-8 text-center max-w-md bg-white/90 backdrop-blur-sm">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Доступ запрещён</h2>
+          <p className="text-gray-700 mb-6">Нельзя редактировать квиз, в который кто-то играет</p>
+          <Button onClick={() => navigate('/quizzes')}>Вернуться к списку</Button>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -293,8 +331,13 @@ const EditQuiz: React.FC = () => {
               type="number"
               value={globalTimer || ''}
               onChange={(e) => {
-                const value = e.target.value ? Number(e.target.value) : undefined;
-                setGlobalTimer((value !== undefined && value <= 0) ? undefined : value);
+                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                if (value !== undefined && (isNaN(value) || value <= 0)) {
+                  setError('Таймер должен быть положительным числом');
+                } else {
+                  setError('');
+                  setGlobalTimer(value);
+                }
               }}
               min="1"
               step="1"
@@ -360,12 +403,14 @@ const EditQuiz: React.FC = () => {
                   type="number"
                   value={q.timer || ''}
                   onChange={(e) => {
-                    const value = e.target.value ? Number(e.target.value) : undefined;
-                    if (globalTimer && value && value > globalTimer) {
-                      setError(`Таймер вопроса не может превышать таймер всего квиза (${globalTimer} сек)`);
+                    const value = e.target.value === '' ? undefined : Number(e.target.value);
+                    if (value !== undefined && (isNaN(value) || value <= 0)) {
+                      setError(`Вопрос ${qIdx + 1}: таймер должен быть положительным числом`);
+                    } else if (globalTimer && value && value > globalTimer) {
+                      setError(`Вопрос ${qIdx + 1}: таймер вопроса не может превышать таймер всего квиза (${globalTimer} сек)`);
                     } else {
                       setError('');
-                      updateQuestion(qIdx, 'timer', (value !== undefined && value <= 0) ? undefined : value);
+                      updateQuestion(qIdx, 'timer', value);
                     }
                   }}
                   min="1"

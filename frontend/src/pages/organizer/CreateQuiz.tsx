@@ -124,6 +124,13 @@ const CreateQuiz: React.FC = () => {
     setQuestions(newQuestions);
   };
 
+  const validateTimer = (value: number | undefined): boolean => {
+    if (value === undefined) return true;
+    if (isNaN(value)) return false;
+    if (value <= 0) return false;
+    return true;
+  };
+
   const validate = (): string | null => {
     if (questions.length < 2) {
       return 'Добавьте хотя бы два вопроса';
@@ -132,23 +139,28 @@ const CreateQuiz: React.FC = () => {
       return 'Введите название квиза';
     }
 
-    if (globalTimer && globalTimer > 0) {
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
-        if (q.timer && q.timer > globalTimer) {
-          return `Вопрос ${i + 1}: таймер вопроса (${q.timer} сек) не может превышать таймер всего квиза (${globalTimer} сек)`;
-        }
-      }
+    if (globalTimer !== undefined && (!validateTimer(globalTimer) || globalTimer <= 0)) {
+      return 'Таймер квиза должен быть положительным числом';
     }
 
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
+
+      if (q.timer !== undefined && (!validateTimer(q.timer) || q.timer <= 0)) {
+        return `Вопрос ${i + 1}: таймер должен быть положительным числом`;
+      }
+
+      if (globalTimer && globalTimer > 0 && q.timer && q.timer > globalTimer) {
+        return `Вопрос ${i + 1}: таймер вопроса (${q.timer} сек) не может превышать таймер всего квиза (${globalTimer} сек)`;
+      }
+
       if (!q.text.trim()) {
         return `Вопрос ${i + 1}: введите текст вопроса`;
       }
       if (q.answers.length < 2) {
         return `Вопрос ${i + 1}: должно быть минимум 2 варианта ответа`;
       }
+
       let hasCorrect = false;
       const answerTexts = new Set();
       for (let j = 0; j < q.answers.length; j++) {
@@ -240,8 +252,13 @@ const CreateQuiz: React.FC = () => {
               type="number"
               value={globalTimer || ''}
               onChange={(e) => {
-                const value = e.target.value ? Number(e.target.value) : undefined;
-                setGlobalTimer((value !== undefined && value <= 0) ? undefined : value);
+                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                if (value !== undefined && (isNaN(value) || value <= 0)) {
+                  setError('Таймер должен быть положительным числом');
+                } else {
+                  setError('');
+                  setGlobalTimer(value);
+                }
               }}
               min="1"
               step="1"
@@ -314,12 +331,14 @@ const CreateQuiz: React.FC = () => {
                     type="number"
                     value={timer || ''}
                     onChange={(e) => {
-                      const value = e.target.value ? Number(e.target.value) : undefined;
-                      if (globalTimer && value && value > globalTimer) {
-                        setError(`Таймер вопроса не может превышать таймер всего квиза (${globalTimer} сек)`);
+                      const value = e.target.value === '' ? undefined : Number(e.target.value);
+                      if (value !== undefined && (isNaN(value) || value <= 0)) {
+                        setError(`Вопрос ${qIdx + 1}: таймер должен быть положительным числом`);
+                      } else if (globalTimer && value && value > globalTimer) {
+                        setError(`Вопрос ${qIdx + 1}: таймер вопроса не может превышать таймер всего квиза (${globalTimer} сек)`);
                       } else {
                         setError('');
-                        updateQuestion(qIdx, 'timer', (value !== undefined && value <= 0) ? undefined : value);
+                        updateQuestion(qIdx, 'timer', value);
                       }
                     }}
                     min="1"

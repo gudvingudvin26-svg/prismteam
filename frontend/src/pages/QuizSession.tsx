@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Card } from '../components/ui';
 import { sessionsApi } from '../api';
@@ -18,30 +18,113 @@ const QuizSession: React.FC = () => {
   const [question, setQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState(30);
+  const [globalTimeLeft, setGlobalTimeLeft] = useState<number | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
   const [isAnswered, setIsAnswered] = useState(false);
+  const [quizTimer, setQuizTimer] = useState<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const globalTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    console.log('QuizSession mounted, sessionId:', sessionId);
+    const checkCompleted = async () => {
+      try {
+        const response = await sessionsApi.getSession(parseInt(sessionId!));
+        if (response.data.is_completed) {
+          navigate(`/results/${sessionId}`, { replace: true });
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      }
+    };
+    checkCompleted();
+  }, [sessionId, navigate]);
+
+  useEffect(() => {
     loadQuestion(0);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (globalTimerRef.current) clearInterval(globalTimerRef.current);
+    };
   }, [sessionId]);
 
   useEffect(() => {
     if (!question || isAnswered) return;
 
-    const timer = setInterval(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(timer);
-          handleSubmitAnswer();
+          clearInterval(timerRef.current!);
+          handleAutoNext();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [question, isAnswered]);
+
+  const startGlobalTimer = (quizTimerValue: number) => {
+    if (globalTimerRef.current) clearInterval(globalTimerRef.current);
+
+    setGlobalTimeLeft(quizTimerValue);
+
+    globalTimerRef.current = setInterval(() => {
+      setGlobalTimeLeft((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(globalTimerRef.current!);
+          handleGlobalTimeout();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleGlobalTimeout = async () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (globalTimerRef.current) clearInterval(globalTimerRef.current);
+
+    try {
+      await sessionsApi.endSession(parseInt(sessionId!));
+      navigate(`/results/${sessionId}`, { replace: true });
+    } catch (error) {
+      console.error('Error ending session:', error);
+      navigate(`/results/${sessionId}`, { replace: true });
+    }
+  };
+
+  const handleAutoNext = async () => {
+    if (isAnswered) return;
+    setIsAnswered(true);
+
+    if (selectedAnswers.length === 0) {
+      setTimeout(() => {
+        loadQuestion(question!.index + 1);
+      }, 500);
+    } else {
+      try {
+        if (question?.question_type === 'multiple') {
+          await sessionsApi.submitMultipleAnswers(parseInt(sessionId!), question!.id, selectedAnswers);
+        } else {
+          await sessionsApi.submitAnswer(parseInt(sessionId!), question!.id, selectedAnswers[0]);
+        }
+        setTimeout(() => {
+          loadQuestion(question!.index + 1);
+        }, 500);
+      } catch (error) {
+        console.error('Error submitting answer:', error);
+        setTimeout(() => {
+          loadQuestion(question!.index + 1);
+        }, 500);
+      }
+    }
+  };
 
   const loadQuestion = async (index: number) => {
     setLoading(true);
@@ -50,18 +133,26 @@ const QuizSession: React.FC = () => {
     setTimeLeft(30);
 
     try {
-      console.log(`Loading question index ${index} for session ${sessionId}`);
       const response = await sessionsApi.getCurrentQuestion(parseInt(sessionId!), index);
 
-      if (response.data.finished) {
-        console.log('Quiz finished, redirecting to results page');
-        navigate(`/results/${sessionId}`);
+      if (response.data.finished || response.data.is_completed) {
+        if (globalTimerRef.current) clearInterval(globalTimerRef.current);
+        navigate(`/results/${sessionId}`, { replace: true });
         return;
       }
 
-      console.log('Question loaded:', response.data);
       setQuestion(response.data);
-      setTimeLeft(response.data.timer || 30);
+      const questionTimer = response.data.timer || 30;
+      setTimeLeft(questionTimer);
+
+      if (quizTimer === null) {
+        const sessionResponse = await sessionsApi.getSession(parseInt(sessionId!));
+        const quizGlobalTimer = sessionResponse.data.quiz?.timer;
+        if (quizGlobalTimer && quizGlobalTimer > 0) {
+          setQuizTimer(quizGlobalTimer);
+          startGlobalTimer(quizGlobalTimer);
+        }
+      }
     } catch (error) {
       console.error('Error fetching question:', error);
     } finally {
@@ -85,14 +176,12 @@ const QuizSession: React.FC = () => {
 
   const handleSubmitAnswer = async () => {
     if (isAnswered) return;
-    if (selectedAnswers.length === 0) {
-      return;
-    }
+    if (selectedAnswers.length === 0) return;
 
     setIsAnswered(true);
+    if (timerRef.current) clearInterval(timerRef.current);
 
     try {
-      console.log('Submitting answer for question:', question?.id);
       if (question?.question_type === 'multiple') {
         await sessionsApi.submitMultipleAnswers(parseInt(sessionId!), question!.id, selectedAnswers);
       } else {
@@ -106,6 +195,12 @@ const QuizSession: React.FC = () => {
       console.error('Error submitting answer:', error);
       setIsAnswered(false);
     }
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -130,6 +225,13 @@ const QuizSession: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
       <div className="max-w-3xl mx-auto">
+        {globalTimeLeft !== null && (
+          <div className="fixed top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
+            <span className="text-gray-600 mr-2">⏱ Общее время:</span>
+            <span className="text-2xl font-bold text-purple-600">{formatTime(globalTimeLeft)}</span>
+          </div>
+        )}
+
         <Card className="p-8 bg-white/90 backdrop-blur-sm">
           <div className="mb-6 flex justify-between items-center">
             <span className="text-gray-500">Вопрос {question.index + 1}</span>
