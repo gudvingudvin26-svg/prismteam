@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import PrivateRoute from './components/PrivateRoute';
 import { authApi } from './api';
@@ -24,92 +24,109 @@ const LoadingSpinner = () => (
   </div>
 );
 
-function App() {
+function AppContent() {
+  const location = useLocation();
   const setUser = useAppStore((state) => state.setUser);
+  const user = useAppStore((state) => state.user);
   const [isAppLoading, setIsAppLoading] = useState(true);
 
   useEffect(() => {
-  const restoreUser = async () => {
-    if (window.location.pathname === '/logout') {
-      setIsAppLoading(false);
-      return;
-    }
-    try {
-      const response = await authApi.getCurrentUser();
-      setUser(response.data);
-    } catch (error) {
-      console.error('Ошибка восстановления пользователя:', error);
-      setUser(null);
-    } finally {
-      setTimeout(() => setIsAppLoading(false), 100);
-    }
-  };
-  restoreUser();
-}, [setUser]);
+    const restoreUser = async () => {
+      const publicPaths = ['/', '/login', '/register', '/join', '/access-denied', '/not-found'];
+      const isPublicPath = publicPaths.some(path => location.pathname === path);
+
+      if (isPublicPath) {
+        setIsAppLoading(false);
+        return;
+      }
+
+      if (user) {
+        setIsAppLoading(false);
+        return;
+      }
+
+      try {
+        const response = await authApi.getCurrentUser();
+        setUser(response.data);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setTimeout(() => setIsAppLoading(false), 100);
+      }
+    };
+
+    restoreUser();
+  }, [location.pathname, user, setUser]);
 
   if (isAppLoading) {
     return <LoadingSpinner />;
   }
 
   return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <div className="animate-fadeIn">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/join" element={<JoinQuiz />} />
+          <Route path="/play/:sessionId" element={<QuizSession />} />
+          <Route path="/results/:sessionId" element={<Results />} />
+          <Route path="/access-denied" element={<AccessDenied />} />
+          <Route path="/not-found" element={<NotFound />} />
+
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/quizzes"
+            element={
+              <PrivateRoute>
+                <QuizList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/quizzes/create"
+            element={
+              <PrivateRoute>
+                <CreateQuiz />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/quizzes/:id/edit"
+            element={
+              <PrivateRoute>
+                <EditQuiz />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/stats"
+            element={
+              <PrivateRoute>
+                <Stats />
+              </PrivateRoute>
+            }
+          />
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
+    </Suspense>
+  );
+}
+
+function App() {
+  return (
     <BrowserRouter>
-      <Suspense fallback={<LoadingSpinner />}>
-        <div className="animate-fadeIn">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/join" element={<JoinQuiz />} />
-            <Route path="/play/:sessionId" element={<QuizSession />} />
-            <Route path="/results/:sessionId" element={<Results />} />
-            <Route path="/access-denied" element={<AccessDenied />} />
-            <Route path="/not-found" element={<NotFound />} />
-
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/quizzes"
-              element={
-                <PrivateRoute>
-                  <QuizList />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/quizzes/create"
-              element={
-                <PrivateRoute>
-                  <CreateQuiz />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/quizzes/:id/edit"
-              element={
-                <PrivateRoute>
-                  <EditQuiz />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/stats"
-              element={
-                <PrivateRoute>
-                  <Stats />
-                </PrivateRoute>
-              }
-            />
-
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </div>
-      </Suspense>
+      <AppContent />
     </BrowserRouter>
   );
 }

@@ -50,45 +50,41 @@ const Stats: React.FC = () => {
       const sessionsResponse = await sessionsApi.getSessionsForQuiz(quizId);
       const sessions = sessionsResponse.data;
 
-      const uniqueParticipants = new Map();
+      const participantScores = new Map();
 
       for (const session of sessions) {
-        if (session.participant_name) {
-          try {
-            const resultsResponse = await sessionsApi.getResults(session.id);
-            const results = resultsResponse.data;
+        if (!session.participant_name) continue;
 
-            if (Array.isArray(results)) {
-              for (const result of results) {
-                const name = result.participant_name || session.participant_name;
-                if (!uniqueParticipants.has(name) || uniqueParticipants.get(name) < result.score) {
-                  uniqueParticipants.set(name, result.score);
-                }
-              }
-            } else if (results && typeof results === 'object') {
-              const name = results.participant_name || session.participant_name;
-              if (!uniqueParticipants.has(name) || uniqueParticipants.get(name) < (results.score || 0)) {
-                uniqueParticipants.set(name, results.score || 0);
-              }
+        try {
+          const myResultResponse = await sessionsApi.getMyResult(session.id);
+          const myResult = myResultResponse.data;
+
+          if (myResult && typeof myResult === 'object') {
+            const name = session.participant_name;
+            const score = myResult.score || 0;
+
+            if (!participantScores.has(name) || participantScores.get(name) < score) {
+              participantScores.set(name, score);
             }
-          } catch (e) {
-            console.error('Error fetching results:', e);
           }
+        } catch (e) {
+          console.error('Error fetching result for session', session.id, e);
         }
       }
 
       const completedSessions = sessions.filter((s: any) => s.status === 'completed');
-      const totalScore = Array.from(uniqueParticipants.values()).reduce((sum, score) => sum + score, 0);
-      const averageScore = uniqueParticipants.size > 0 ? Math.round(totalScore / uniqueParticipants.size) : 0;
+      const allScores = Array.from(participantScores.values());
+      const totalScore = allScores.reduce((sum, score) => sum + score, 0);
+      const averageScore = participantScores.size > 0 ? Math.round(totalScore / participantScores.size) : 0;
 
       setQuizStats({
         total_sessions: sessions.length,
-        total_participants: uniqueParticipants.size,
+        total_participants: participantScores.size,
         completed_sessions: completedSessions.length,
         average_score: averageScore
       });
 
-      const leaderboardData = Array.from(uniqueParticipants.entries())
+      const leaderboardData = Array.from(participantScores.entries())
         .map(([name, score]) => ({ participant_name: name, score }))
         .sort((a, b) => b.score - a.score)
         .slice(0, 10);
@@ -98,24 +94,30 @@ const Stats: React.FC = () => {
       if (completedSessions.length > 0) {
         const allQuestionsStats: { [key: number]: { text: string; total: number; correct: number } } = {};
 
-        for (const session of completedSessions.slice(0, 5)) {
+        const questionsResponse = await quizzesApi.getQuiz(quizId);
+        const questions = questionsResponse.data.questions || [];
+
+        for (const question of questions) {
+          allQuestionsStats[question.id] = {
+            text: question.text,
+            total: 0,
+            correct: 0
+          };
+        }
+
+        for (const session of completedSessions) {
           try {
             const statsResponse = await sessionsApi.getQuestionsStats(session.id);
             if (Array.isArray(statsResponse.data)) {
               for (const stat of statsResponse.data) {
-                if (!allQuestionsStats[stat.question_id]) {
-                  allQuestionsStats[stat.question_id] = {
-                    text: stat.question_text,
-                    total: 0,
-                    correct: 0
-                  };
+                if (allQuestionsStats[stat.question_id]) {
+                  allQuestionsStats[stat.question_id].total += stat.total_answers || 0;
+                  allQuestionsStats[stat.question_id].correct += stat.correct_count || 0;
                 }
-                allQuestionsStats[stat.question_id].total += stat.total_answers || 0;
-                allQuestionsStats[stat.question_id].correct += stat.correct_count || 0;
               }
             }
           } catch (e) {
-            console.error('Error fetching stats:', e);
+            console.error('Error fetching stats for session', session.id, e);
           }
         }
 

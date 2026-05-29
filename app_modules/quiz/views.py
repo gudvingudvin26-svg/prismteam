@@ -201,17 +201,21 @@ class UserLogout(APIView):
             extra={'user_id': user_id}
         )
 
-        response = redirect('/')
+        response = Response({"detail": "Успешно вышли из системы"}, status=status.HTTP_200_OK)
         response.delete_cookie('access_token', path='/')
         response.delete_cookie('refresh_token', path='/')
+        response.delete_cookie('csrftoken', path='/')
+        response.delete_cookie('sessionid', path='/')
         return response
 
     def get(self, request):
         if request.user.is_authenticated:
             logout(request)
-        response = redirect('/')
+        response = Response({"detail": "Успешно вышли из системы"}, status=status.HTTP_200_OK)
         response.delete_cookie('access_token', path='/')
         response.delete_cookie('refresh_token', path='/')
+        response.delete_cookie('csrftoken', path='/')
+        response.delete_cookie('sessionid', path='/')
         return response
 
 
@@ -357,6 +361,8 @@ class UserLoginAPI(APIView):
             path='/'
         )
         return response
+
+
 class TokenRefreshAPI(APIView):
     def post(self, request):
         refresh_token = request.COOKIES.get('refresh_token')
@@ -388,6 +394,8 @@ class TokenRefreshAPI(APIView):
                 {'error': 'Недействительный refresh токен'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
+
+
 class GetCurrentUserAPI(APIView):
     permission_classes = [permissions.IsAuthenticated]
     throttle_classes = [UserRateThrottle]
@@ -400,6 +408,8 @@ class GetCurrentUserAPI(APIView):
             'first_name': user.first_name,
             'last_name': user.last_name
         }, status=status.HTTP_200_OK)
+
+
 class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -455,12 +465,47 @@ class QuizViewSet(viewsets.ModelViewSet):
             extra={'quiz_id': kwargs.get('pk'), 'user_id': request.user.id}
         )
         return super().update(request, *args, **kwargs)
+
     def destroy(self, request, *args, **kwargs):
-        quiz_log.info(
-            f"Удаление квиза {kwargs.get('pk')}",
-            extra={'quiz_id': kwargs.get('pk'), 'user_id': request.user.id}
-        )
-        return super().destroy(request, *args, **kwargs)
+        quiz_id = kwargs.get('pk')
+        quiz_log.info(f"Удаление квиза {quiz_id} пользователем {request.user.id}")
+
+        try:
+            quiz = self.get_queryset().filter(id=quiz_id).first()
+            if not quiz:
+                return Response(
+                    {"detail": "Квиз не найден"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            if quiz.created_by != request.user:
+                return Response(
+                    {"detail": "У вас нет прав на удаление этого квиза"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            try:
+                from app_modules.quiz_sessions.models import QuizSession
+                QuizSession.objects.filter(quiz_id=quiz_id).delete()
+                quiz_log.info(f"Удалены сессии для квиза {quiz_id}")
+            except Exception as e:
+                quiz_log.warning(f"Ошибка при удалении сессий: {e}")
+
+            quiz.delete()
+            quiz_log.info(f"Квиз {quiz_id} успешно удален")
+
+            return Response(
+                {"detail": "Квиз успешно удален"},
+                status=status.HTTP_204_NO_CONTENT
+            )
+
+        except Exception as e:
+            quiz_log.error(f"Ошибка удаления квиза {quiz_id}: {e}")
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def publish(self, request, pk=None):
         quiz = self.get_object()
@@ -479,6 +524,8 @@ class QuizViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         quiz = QuizFactory.create_quiz(serializer.validated_data, self.request.user)
         serializer.instance = quiz
+
+
 class QuestionViewSet(viewsets.ModelViewSet):
     serializer_class = QuestionSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -488,6 +535,8 @@ class QuestionViewSet(viewsets.ModelViewSet):
         return Question.objects.filter(
             quiz__created_by=user
         ).select_related('quiz').prefetch_related('answer_options')
+
+
 class AnswerOptionViewSet(viewsets.ModelViewSet):
     serializer_class = AnswerOptionSerializer
     permission_classes = [permissions.IsAuthenticated]

@@ -13,11 +13,14 @@ const Home: React.FC = () => {
   const handleLogout = async () => {
     try {
       await authApi.logout();
-    } catch (e) {
-      console.error('Logout error:', e);
+      setUser(null);
+      localStorage.removeItem('app-storage');
+      navigate('/', { replace: true });
+    } catch (error) {
+      setUser(null);
+      localStorage.removeItem('app-storage');
+      navigate('/', { replace: true });
     }
-    setUser(null);
-    window.location.href = '/';
   };
 
   return (

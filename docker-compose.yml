@@ -14,6 +14,7 @@
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -24,6 +25,7 @@
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   backend:
     build: .
@@ -41,11 +43,11 @@
       redis:
         condition: service_healthy
     volumes:
-      - .:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
+    restart: unless-stopped
 
   nginx:
     image: nginx:alpine
@@ -58,7 +60,7 @@
       - ./frontend/dist:/usr/share/nginx/html
     depends_on:
       - backend
-    restart: always
+    restart: unless-stopped
 
 volumes:
   postgres_data:
