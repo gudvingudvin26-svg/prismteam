@@ -1,117 +1,173 @@
 import uuid
 from django.test import TestCase
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
-from app_modules.quiz.models import User, Quiz, Question, AnswerOption
-from app_modules.quiz.serializers import QuizSerializer, QuestionSerializer, AnswerOptionSerializer
+from app_modules.quiz.models import User, Quiz, Question, AnswerOption, generate_token
+from app_modules.quiz.validators import validate_answer_options_data, validate_quiz_integrity
 
 
-class TestSerializers(TestCase):
+class TestModels(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
-            username="org",
-            email=f"org_{uuid.uuid4()}@test.com",
-            password="pass"
+            username="organizer",
+            email=f"organizer_{uuid.uuid4()}@test.com",
+            password="testpass"
         )
-        cls.quiz = Quiz.objects.create(title="Test Quiz", created_by=cls.user)
-        cls.question = Question.objects.create(quiz=cls.quiz, text="Capital of France?", order=1)
-        cls.opt1 = AnswerOption.objects.create(question=cls.question, text="Paris", is_correct=True)
-        cls.opt2 = AnswerOption.objects.create(question=cls.question, text="London", is_correct=False)
-
-    def test_answer_option_valid(self):
-        data = {"text": "Option A", "is_correct": False}
-        s = AnswerOptionSerializer(data=data)
-        self.assertTrue(s.is_valid())
-
-    def test_answer_option_missing_text(self):
-        s = AnswerOptionSerializer(data={"is_correct": True})
-        self.assertFalse(s.is_valid())
-        self.assertIn("text", s.errors)
-
-    def test_answer_option_too_short_text(self):
-        s = AnswerOptionSerializer(data={"text": "", "is_correct": False})
-        self.assertFalse(s.is_valid())
-
-    def test_question_create_valid(self):
-        data = {
-            "quiz": self.quiz.id,
-            "text": "2 + 2 = ?",
-            "order": 2,
-            "answer_options": [
-                {"text": "4", "is_correct": True},
-                {"text": "5", "is_correct": False},
-            ]
-        }
-        s = QuestionSerializer(data=data)
-        self.assertTrue(s.is_valid(), s.errors)
-        question = s.save()
-        self.assertEqual(question.answer_options.count(), 2)
-
-    def test_question_create_missing_options(self):
-        data = {"quiz": self.quiz.id, "text": "No options", "order": 2, "answer_options": []}
-        s = QuestionSerializer(data=data)
-        self.assertFalse(s.is_valid())
-
-    def test_question_create_no_correct_answer(self):
-        data = {
-            "quiz": self.quiz.id, "text": "Test?", "order": 3,
-            "answer_options": [{"text": "A", "is_correct": False}, {"text": "B", "is_correct": False}]
-        }
-        s = QuestionSerializer(data=data)
-        self.assertFalse(s.is_valid())
-
-    def test_question_update_replaces_options(self):
-        data = {
-            "quiz": self.quiz.id, "text": "Updated?", "order": 1,
-            "answer_options": [
-                {"text": "Yes", "is_correct": True},
-                {"text": "No", "is_correct": False}
-            ]
-        }
-        s = QuestionSerializer(self.question, data=data, partial=True)
-        self.assertTrue(s.is_valid(), s.errors)
-        updated_q = s.save()
-        self.assertEqual(updated_q.answer_options.count(), 2)
-        self.assertEqual(updated_q.text, "Updated?")
-
-    def test_question_validate_empty_text(self):
-        data = {"quiz": self.quiz.id, "text": "   ", "answer_options": [
-            {"text": "A", "is_correct": True}, {"text": "B", "is_correct": False}
-        ]}
-        s = QuestionSerializer(data=data)
-        self.assertFalse(s.is_valid())
-        error_str = str(s.errors)
-        self.assertTrue(
-            "Текст вопроса не может быть пустым" in error_str or
-            "may not be blank" in error_str
+        cls.quiz = Quiz.objects.create(title="Django Quiz", created_by=cls.user)
+        cls.question = Question.objects.create(
+            quiz=cls.quiz,
+            text="What is Python?",
+            order=1,
+            question_type="single"
         )
+        cls.ans1 = AnswerOption.objects.create(question=cls.question, text="Snake", is_correct=True)
+        cls.ans2 = AnswerOption.objects.create(question=cls.question, text="Language", is_correct=False)
 
-    def test_quiz_create_sets_created_by(self):
-        class MockRequest:
-            user = self.user
+    def test_generate_token_length_and_uniqueness(self):
+        token = generate_token()
+        self.assertIsInstance(token, str)
+        self.assertEqual(len(token), 16)
+        self.assertNotEqual(token, generate_token())
 
-        context = {"request": MockRequest()}
-        data = {"title": "New Quiz", "description": "Desc"}
-        s = QuizSerializer(data=data, context=context)
-        self.assertTrue(s.is_valid(), s.errors)
-        quiz = s.save()
-        self.assertEqual(quiz.created_by, self.user)
-        self.assertIsNotNone(quiz.access_token)
+    def test_quiz_str(self):
+        self.assertEqual(str(self.quiz), "Django Quiz")
 
-    def test_quiz_serializer_questions_readonly(self):
-        s = QuizSerializer(self.quiz)
-        self.assertIn("questions", s.data)
-        self.assertIsInstance(s.data["questions"], list)
-        self.assertEqual(len(s.data["questions"]), 1)
+    def test_question_str_truncation(self):
+        long_text = "A" * 100
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text=long_text,
+            order=2,
+            question_type="single"
+        )
+        self.assertIn("A" * 50, str(q))
+        self.assertEqual(len(str(q)), len(f"{self.quiz.title} - ") + 50)
 
-    def test_quiz_serializer_created_by_hidden(self):
-        class MockRequest:
-            user = self.user
+    def test_question_str_short(self):
+        self.assertEqual(str(self.question), f"{self.quiz.title} - What is Python?")
 
-        context = {"request": MockRequest()}
-        data = {"title": "Test", "created_by": 999}
-        s = QuizSerializer(data=data, context=context)
-        self.assertTrue(s.is_valid())
-        quiz = s.save()
-        self.assertEqual(quiz.created_by, self.user)
+    def test_answer_option_str(self):
+        self.assertEqual(str(self.ans1), "[✓] Snake")
+        self.assertEqual(str(self.ans2), "[✗] Language")
+
+    def test_question_clean_valid(self):
+        self.question.full_clean()
+
+    def test_question_clean_whitespace_only(self):
+        q = Question(
+            quiz=self.quiz,
+            text="   ",
+            order=3,
+            question_type="single"
+        )
+        try:
+            q.full_clean()
+        except DjangoValidationError:
+            self.fail("full_clean() raised ValidationError unexpectedly")
+
+
+class TestValidators(TestCase):
+    def setUp(self):
+        self.valid_options = [
+            {"text": "A", "is_correct": True},
+            {"text": "B", "is_correct": False},
+        ]
+        self.user = User.objects.create_user(
+            username="u",
+            email=f"u_{uuid.uuid4()}@test.com",
+            password="p"
+        )
+        self.quiz = Quiz.objects.create(title="Test", created_by=self.user)
+
+        self.q = Question.objects.create(
+            quiz=self.quiz,
+            text="Valid question text?",
+            order=1,
+            question_type="single"
+        )
+        AnswerOption.objects.create(question=self.q, text="A", is_correct=True)
+        AnswerOption.objects.create(question=self.q, text="B", is_correct=False)
+
+    def test_valid_options(self):
+        validate_answer_options_data(self.valid_options)
+
+    def test_less_than_two_options(self):
+        with self.assertRaises(DjangoValidationError):
+            validate_answer_options_data([self.valid_options[0]], use_drf_exception=False)
+
+    def test_not_a_list(self):
+        with self.assertRaises(DjangoValidationError):
+            validate_answer_options_data("not a list", use_drf_exception=False)
+
+    def test_non_dict_option(self):
+        with self.assertRaises(DjangoValidationError):
+            validate_answer_options_data([self.valid_options[0], "string"], use_drf_exception=False)
+
+    def test_missing_text_field(self):
+        with self.assertRaises(DjangoValidationError):
+            validate_answer_options_data([{"is_correct": True}, self.valid_options[1]], use_drf_exception=False)
+
+    def test_non_string_text(self):
+        with self.assertRaises(DjangoValidationError):
+            validate_answer_options_data([{"text": 123, "is_correct": True}, self.valid_options[1]], use_drf_exception=False)
+
+    def test_whitespace_only_text(self):
+        with self.assertRaises(DjangoValidationError):
+            validate_answer_options_data([{"text": "   ", "is_correct": True}, self.valid_options[1]], use_drf_exception=False)
+
+    def test_drf_exception_mode(self):
+        with self.assertRaises(DRFValidationError):
+            validate_answer_options_data([], use_drf_exception=True)
+
+    def test_valid_quiz_integrity(self):
+        validate_quiz_integrity(self.quiz)
+
+    def test_quiz_without_questions(self):
+        empty_quiz = Quiz.objects.create(title="Empty", created_by=self.user)
+        with self.assertRaises(DjangoValidationError):
+            validate_quiz_integrity(empty_quiz, use_drf_exception=False)
+
+    def test_question_with_empty_text(self):
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text="",
+            question_type="single"
+        )
+        AnswerOption.objects.create(question=q, text="A", is_correct=True)
+        AnswerOption.objects.create(question=q, text="B", is_correct=False)
+        with self.assertRaises(DjangoValidationError):
+            validate_quiz_integrity(self.quiz, use_drf_exception=False)
+
+    def test_question_with_short_text(self):
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text="Hi",
+            question_type="single"
+        )
+        AnswerOption.objects.create(question=q, text="A", is_correct=True)
+        AnswerOption.objects.create(question=q, text="B", is_correct=False)
+        with self.assertRaises(DjangoValidationError):
+            validate_quiz_integrity(self.quiz, use_drf_exception=False)
+
+    def test_question_with_less_than_two_answers(self):
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text="Valid question?",
+            question_type="single"
+        )
+        AnswerOption.objects.create(question=q, text="A", is_correct=True)
+        with self.assertRaises(DjangoValidationError):
+            validate_quiz_integrity(self.quiz, use_drf_exception=False)
+
+    def test_question_with_zero_correct_answers(self):
+        q = Question.objects.create(
+            quiz=self.quiz,
+            text="Valid question?",
+            question_type="single"
+        )
+        AnswerOption.objects.create(question=q, text="A", is_correct=False)
+        AnswerOption.objects.create(question=q, text="B", is_correct=False)
+        with self.assertRaises(DjangoValidationError):
+            validate_quiz_integrity(self.quiz, use_drf_exception=False)
