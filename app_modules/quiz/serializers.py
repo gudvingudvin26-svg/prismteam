@@ -2,6 +2,7 @@ import logging
 from rest_framework import serializers
 from .models import User, Question, AnswerOption, Quiz
 from .validators import validate_answer_options_data
+from .repositories import QuestionRepository
 
 quiz_log = logging.getLogger('quiz_log')
 
@@ -57,28 +58,23 @@ class QuestionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         options_data = validated_data.pop('answer_options')
-        question = Question.objects.create(**validated_data)
 
-        AnswerOption.objects.bulk_create([
-            AnswerOption(question=question, **opt) for opt in options_data
-        ])
-        return question
+        return QuestionRepository.create_question_with_answers(
+            answer_options=options_data,
+            **validated_data
+        )
 
     def update(self, instance, validated_data):
-        options_data = validated_data.pop('answer_options', None)
+        options_data = validated_data.pop(
+            'answer_options',
+            None
+        )
 
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        if options_data is not None:
-            instance.answer_options.all().delete()
-            AnswerOption.objects.bulk_create([
-                AnswerOption(question=instance, **opt) for opt in options_data
-            ])
-
-        quiz_log.info(f'Organizer updated question in the quiz successfully')
-        return instance
+        return QuestionRepository.update_question_with_answers(
+            instance=instance,
+            answer_options=options_data,
+            **validated_data
+        )
 
 
 class QuizSerializer(serializers.ModelSerializer):

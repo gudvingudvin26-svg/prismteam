@@ -1,9 +1,7 @@
 import logging
-from datetime import datetime, timedelta
-
+from .repositories import QuizRepository, QuestionRepository
 from .factories import QuizFactory
 from django.contrib.auth import logout, login
-from django.db.models import Prefetch
 from django.shortcuts import render, redirect
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
@@ -12,8 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from config import settings
-from .models import User, Quiz, Question, AnswerOption
+from .models import User, Quiz, AnswerOption
 from .serializers import UserSerializer, QuizSerializer, QuestionSerializer, AnswerOptionSerializer
 from .validators import validate_quiz_integrity
 
@@ -247,15 +244,9 @@ class QuizViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        user = self.request.user
-        return Quiz.objects.filter(
-            created_by=user
-        ).prefetch_related(
-            Prefetch(
-                'questions',
-                queryset=Question.objects.select_related('quiz').prefetch_related('answer_options')
-            )
-        ).select_related('created_by').order_by('-id')
+        return QuizRepository.get_user_quizzes(
+            self.request.user
+        )
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -315,10 +306,9 @@ class QuestionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        user = self.request.user
-        return Question.objects.filter(
-            quiz__created_by=user
-        ).select_related('quiz').prefetch_related('answer_options')
+        return QuestionRepository.get_queryset().filter(
+            quiz__created_by=self.request.user
+        )
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
