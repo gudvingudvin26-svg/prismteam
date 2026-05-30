@@ -20,25 +20,6 @@ logger = logging.getLogger('quiz_log')
 
 
 class QuizFactory:
-    """Фабрика для создания и инициализации объектов модели Quiz.
-
-    Предназначена для инкапсуляции бизнес-логики создания квизов:
-    • Валидация и нормализация входных данных из serializer/request;
-    • Автоматическая привязка квиза к пользователю-создателю;
-    • Установка значений по умолчанию для необязательных полей;
-    • Логирование успешных операций создания для аудита и мониторинга.
-
-    Класс реализован через статические методы, так как не хранит
-    внутреннее состояние и не требует инициализации экземпляра.
-    Это упрощает использование в представлениях, сервисах и тестах.
-
-    Пример использования:
-        quiz = QuizFactory.create_quiz(
-            data={'title': 'Мой квиз', 'timer': 60},
-            user=request.user
-        )
-    """
-
     @staticmethod
     def create_quiz(data: Dict[str, Any], user) -> Quiz:
         """Создаёт новый экземпляр квиза с заданными параметрами.
@@ -75,12 +56,14 @@ class QuizFactory:
             • Запись в базу данных (INSERT в таблицу quiz_quiz).
             • Запись в лог 'quiz_log' уровня INFO с данными о создании.
         """
-        quiz = Quiz.objects.create(
-            title=data.get('title'),
-            description=data.get('description', ''),
-            created_by=user,
-            timer=data.get('timer'),
-            points_per_question=data.get('points_per_question', 100)
-        )
-        logger.info(f"Quiz created: {quiz.id} by user {user.username}")
+        quiz_data = {
+            'title': data.get('title'),
+            'description': data.get('description'),
+            'timer': data.get('timer'),
+            'points_per_question': data.get('points_per_question', 100),
+            'created_by': user,
+        }
+
+        quiz = Quiz.objects.create(**quiz_data)
+
         return quiz

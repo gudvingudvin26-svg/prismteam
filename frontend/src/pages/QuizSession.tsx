@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Card } from '../components/ui';
 import { sessionsApi } from '../api';
@@ -18,120 +18,30 @@ const QuizSession: React.FC = () => {
   const [question, setQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState(30);
-  const [globalTimeLeft, setGlobalTimeLeft] = useState<number | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
   const [isAnswered, setIsAnswered] = useState(false);
-  const [globalTimerStarted, setGlobalTimerStarted] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const globalTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const checkCompleted = async () => {
-      try {
-        const response = await sessionsApi.getSession(parseInt(sessionId!));
-        if (response.data.is_completed) {
-          navigate(`/results/${sessionId}`, { replace: true });
-          return;
-        }
-      } catch (error) {
-        console.error('Error checking session:', error);
-      }
-    };
-    checkCompleted();
-  }, [sessionId, navigate]);
-
-  useEffect(() => {
+    console.log('QuizSession mounted, sessionId:', sessionId);
     loadQuestion(0);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (globalTimerRef.current) clearInterval(globalTimerRef.current);
-    };
   }, [sessionId]);
 
   useEffect(() => {
     if (!question || isAnswered) return;
 
-    if (timerRef.current) clearInterval(timerRef.current);
-
-    timerRef.current = setInterval(() => {
+    const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(timerRef.current!);
-          handleAutoNext();
+          clearInterval(timer);
+          handleSubmitAnswer();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => clearInterval(timer);
   }, [question, isAnswered]);
-
-  const startGlobalTimer = (quizTimerValue: number) => {
-    // Запускаем таймер только один раз
-    if (globalTimerStarted) return;
-
-    if (globalTimerRef.current) clearInterval(globalTimerRef.current);
-
-    setGlobalTimerStarted(true);
-    setGlobalTimeLeft(quizTimerValue);
-
-    console.log(`Общий таймер запущен: ${quizTimerValue} секунд`);
-
-    globalTimerRef.current = setInterval(() => {
-      setGlobalTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
-          if (globalTimerRef.current) clearInterval(globalTimerRef.current);
-          handleGlobalTimeout();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const handleGlobalTimeout = async () => {
-    console.log('Общий таймер закончился!');
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (globalTimerRef.current) clearInterval(globalTimerRef.current);
-
-    try {
-      await sessionsApi.endSession(parseInt(sessionId!));
-      navigate(`/results/${sessionId}`, { replace: true });
-    } catch (error) {
-      console.error('Error ending session:', error);
-      navigate(`/results/${sessionId}`, { replace: true });
-    }
-  };
-
-  const handleAutoNext = async () => {
-    if (isAnswered) return;
-    setIsAnswered(true);
-
-    if (timerRef.current) clearInterval(timerRef.current);
-
-    if (selectedAnswers.length === 0) {
-      setTimeout(() => {
-        loadQuestion(question!.index + 1);
-      }, 500);
-    } else {
-      try {
-        if (question?.question_type === 'multiple') {
-          await sessionsApi.submitMultipleAnswers(parseInt(sessionId!), question!.id, selectedAnswers);
-        } else {
-          await sessionsApi.submitAnswer(parseInt(sessionId!), question!.id, selectedAnswers[0]);
-        }
-        setTimeout(() => {
-          loadQuestion(question!.index + 1);
-        }, 500);
-      } catch (error) {
-        console.error('Error submitting answer:', error);
-        setIsAnswered(false);
-      }
-    }
-  };
 
   const loadQuestion = async (index: number) => {
     setLoading(true);
@@ -140,31 +50,18 @@ const QuizSession: React.FC = () => {
     setTimeLeft(30);
 
     try {
+      console.log(`Loading question index ${index} for session ${sessionId}`);
       const response = await sessionsApi.getCurrentQuestion(parseInt(sessionId!), index);
 
-      if (response.data.finished || response.data.is_completed) {
-        navigate(`/results/${sessionId}`, { replace: true });
+      if (response.data.finished) {
+        console.log('Quiz finished, redirecting to results page');
+        navigate(`/results/${sessionId}`);
         return;
       }
 
+      console.log('Question loaded:', response.data);
       setQuestion(response.data);
-      const questionTimer = response.data.timer || 30;
-      setTimeLeft(questionTimer);
-
-      if (!globalTimerStarted) {
-        const sessionResponse = await sessionsApi.getSession(parseInt(sessionId!));
-        let quizGlobalTimer = sessionResponse.data.quiz?.timer;
-
-        if (!quizGlobalTimer || quizGlobalTimer <= 0) {
-          console.log('Таймер не задан, используется значение по умолчанию: 60 секунд');
-          quizGlobalTimer = 60;
-        } else {
-          console.log(`Таймер квиза: ${quizGlobalTimer} секунд`);
-        }
-
-        startGlobalTimer(quizGlobalTimer);
-      }
-
+      setTimeLeft(response.data.timer || 30);
     } catch (error) {
       console.error('Error fetching question:', error);
     } finally {
@@ -188,31 +85,40 @@ const QuizSession: React.FC = () => {
 
   const handleSubmitAnswer = async () => {
     if (isAnswered) return;
-    if (selectedAnswers.length === 0) return;
-
     setIsAnswered(true);
-    if (timerRef.current) clearInterval(timerRef.current);
 
     try {
-      if (question?.question_type === 'multiple') {
-        await sessionsApi.submitMultipleAnswers(parseInt(sessionId!), question!.id, selectedAnswers);
+      console.log('Submitting answer for question:', question?.id);
+
+
+      if (selectedAnswers.length > 0) {
+
+        if (question?.question_type === 'multiple') {
+          await sessionsApi.submitMultipleAnswers(
+            parseInt(sessionId!),
+            question!.id,
+            selectedAnswers
+          );
+        } else {
+          await sessionsApi.submitAnswer(
+            parseInt(sessionId!),
+            question!.id,
+            selectedAnswers[0]
+          );
+        }
+
       } else {
-        await sessionsApi.submitAnswer(parseInt(sessionId!), question!.id, selectedAnswers[0]);
+        console.log('Time expired, no answer selected');
       }
 
       setTimeout(() => {
         loadQuestion(question!.index + 1);
       }, 500);
+
     } catch (error) {
       console.error('Error submitting answer:', error);
       setIsAnswered(false);
     }
-  };
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -226,7 +132,7 @@ const QuizSession: React.FC = () => {
   if (!question) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
-        <Card className="p-8 text-center bg-white/90 backdrop-blur-sm">
+        <Card className="p-8 text-center">
           <p className="text-gray-700 mb-4">Вопрос не найден</p>
           <Button onClick={() => navigate('/')}>На главную</Button>
         </Card>
@@ -237,44 +143,29 @@ const QuizSession: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800 py-8 px-4">
       <div className="max-w-3xl mx-auto">
-        {globalTimeLeft !== null && (
-          <div className="fixed top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg z-10">
-            <span className="text-gray-600 mr-2">⏱ Общее время:</span>
-            <span className={`text-2xl font-bold ${globalTimeLeft < 10 ? 'text-red-600' : 'text-purple-600'}`}>
-              {formatTime(globalTimeLeft)}
-            </span>
-          </div>
-        )}
-
         <Card className="p-8 bg-white/90 backdrop-blur-sm">
           <div className="mb-6 flex justify-between items-center">
             <span className="text-gray-500">Вопрос {question.index + 1}</span>
-            <span className={`text-2xl font-bold ${timeLeft < 10 ? 'text-red-600 animate-pulse' : 'text-purple-600'}`}>
-              ⏱ {timeLeft} сек
-            </span>
+            <span className="text-2xl font-bold text-purple-600">⏱ {timeLeft} сек</span>
           </div>
 
           <h2 className="text-2xl font-bold mb-8 text-gray-900">{question.text}</h2>
 
           <div className="space-y-3">
-            {question.answers && question.answers.length > 0 ? (
-              question.answers.map((answer) => (
-                <button
-                  key={answer.id}
-                  onClick={() => toggleAnswer(answer.id)}
-                  disabled={isAnswered}
-                  className={`w-full text-left p-4 rounded-lg border transition ${
-                    selectedAnswers.includes(answer.id)
-                      ? 'bg-purple-100 border-purple-500'
-                      : 'bg-white border-gray-300 hover:bg-purple-50'
-                  } ${isAnswered ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
-                >
-                  {answer.text}
-                </button>
-              ))
-            ) : (
-              <div className="text-center text-gray-500">Нет вариантов ответа</div>
-            )}
+            {question.answers.map((answer) => (
+              <button
+                key={answer.id}
+                onClick={() => toggleAnswer(answer.id)}
+                disabled={isAnswered}
+                className={`w-full text-left p-4 rounded-lg border transition ${
+                  selectedAnswers.includes(answer.id)
+                    ? 'bg-purple-100 border-purple-500'
+                    : 'bg-white border-gray-300 hover:bg-purple-50'
+                } ${isAnswered ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+              >
+                {answer.text}
+              </button>
+            ))}
           </div>
 
           <div className="mt-8">

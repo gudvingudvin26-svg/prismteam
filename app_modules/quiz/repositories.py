@@ -1,68 +1,187 @@
-"""Репозитории для доступа к данным: базовый CRUD и специализированные запросы."""
-from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import QuerySet, Prefetch
-from typing import TypeVar, Generic, Optional
+from typing import Generic, Optional, TypeVar
 
-T = TypeVar('T')  # Тип-параметр для обобщённой типизации репозиториев
+from django.db import transaction
+from django.db.models import Prefetch, QuerySet
+
+from .models import Quiz, Question, AnswerOption
+from .validators import validate_quiz_integrity
+
+T = TypeVar('T')
 
 
 class BaseRepository(Generic[T]):
-    """Базовый репозиторий с типовыми CRUD-операциями для любой модели."""
-    model: type[T] | None = None
+    model = None
 
-    def __init__(self):
-        """Инициализация: проверка наличия указанной модели."""
-        if self.model is None:
-            raise ValueError("Необходимо указать модель в атрибуте model")
+    @classmethod
+    def get_queryset(cls) -> QuerySet:
+        return cls.model.objects.all()
 
-    def get_all(self) -> QuerySet[T]:
-        """Возврат всех записей модели как QuerySet."""
-        return self.model.objects.all()
+    @classmethod
+    def get_by_id(cls, obj_id: int) -> Optional[T]:
+        return cls.get_queryset().filter(id=obj_id).first()
 
-    def get_by_id(self, obj_id) -> Optional[T]:
-        """Получение объекта по первичному ключу или None при отсутствии."""
-        try:
-            return self.model.objects.get(pk=obj_id)
-        except ObjectDoesNotExist:
-            return None
+    @classmethod
+    def create(cls, **kwargs) -> T:
+        return cls.model.objects.create(**kwargs)
 
-    def create(self, **kwargs) -> T:
-        """Создание новой записи модели с переданными параметрами."""
-        return self.model.objects.create(**kwargs)
+    @classmethod
+    def update(cls, instance: T, **kwargs) -> T:
+        for field, value in kwargs.items():
+            setattr(instance, field, value)
 
-    def update(self, instance: T, **kwargs) -> T:
-        """Обновление полей экземпляра модели и сохранение."""
-        for attr, value in kwargs.items():
-            setattr(instance, attr, value)
         instance.save()
+
         return instance
 
-    def delete(self, instance: T) -> None:
-        """Удаление экземпляра модели из базы данных."""
+    @classmethod
+    def delete(cls, instance: T) -> None:
         instance.delete()
 
-    def filter(self, **kwargs) -> QuerySet[T]:
-        """Фильтрация записей модели по произвольным условиям."""
-        return self.model.objects.filter(**kwargs)
+    @classmethod
+    def filter(cls, **kwargs) -> QuerySet:
+        return cls.get_queryset().filter(**kwargs)
 
 
-class QuizRepository(BaseRepository):
-    """Специализированный репозиторий для модели Quiz с расширенными запросами."""
+class QuizRepository(BaseRepository[Quiz]):
+    model = Quiz
 
-    def get_with_questions(self, quiz_id: int, user):
-        """
-        Получение квиза с предзагруженными вопросами и вариантами ответов.
+    @classmethod
+    def get_queryset(cls):
+        return (
+            cls.model.objects
+            .select_related('created_by')
+            .prefetch_related(
+                Prefetch(
+                    'questions',
+                    queryset=Question.objects.prefetch_related(
+                        'answer_options'
+                    ).order_by('order')
+                )
+            )
+        )
 
-        Фильтрует по ID квиза и пользователю-создателю, оптимизирует запрос
-        через prefetch_related для связанных данных.
+    @classmethod
+    def get_user_quizzes(cls, user) -> QuerySet[Quiz]:
+        return (
+            cls.get_queryset()
+            .filter(created_by=user)
+            .order_by('-id')
+        )
 
-        Args:
-            quiz_id: ID искомого квиза.
-            user: Пользователь, которому должен принадлежать квиз.
+    @classmethod
+    def get_user_quiz_by_id(cls, user, quiz_id: int) -> Optional[Quiz]:
+        return (
+            cls.get_queryset()
+            .filter(created_by=user, id=quiz_id)
+            .first()
+        )
 
-        Returns:
-            Quiz или None, если не найден или нет прав доступа.
-        """
-        return self.model.objects.filter(
-            id=quiz_id, created_by=user
-        ).prefetch_related('questions__answer_options').first()
+    @classmethod
+    @transaction.atomic
+    def publish_quiz(cls, quiz: Quiz) -> Quiz:
+        validate_quiz_integrity(
+            quiz,
+            use_drf_exception=True
+        )
+
+        quiz.save()
+
+        return quiz
+
+
+class QuestionRepository(BaseRepository[Question]):
+    model = Question
+
+    @classmethod
+    def get_queryset(cls):
+        return (
+            cls.model.objects
+            .select_related('quiz')
+            .prefetch_related('answer_options')
+        )
+
+    @classmethod
+    def get_quiz_questions(cls, quiz_id: int) -> QuerySet[Question]:
+        return (
+            cls.get_queryset()
+            .filter(quiz_id=quiz_id)
+            .order_by('order')
+        )
+
+    @classmethod
+    def get_user_question(cls, user, question_id: int) -> Optional[Question]:
+        return (
+            cls.get_queryset()
+            .filter(
+                id=question_id,
+                quiz__created_by=user
+            )
+            .first()
+        )
+
+    @classmethod
+    @transaction.atomic
+    def create_question_with_answers(
+        cls,
+        answer_options: list,
+        **question_data
+    ) -> Question:
+        question = cls.model.objects.create(**question_data)
+
+        AnswerOption.objects.bulk_create([
+            AnswerOption(
+                question=question,
+                **option
+            )
+            for option in answer_options
+        ])
+
+        return question
+
+    @classmethod
+    @transaction.atomic
+    def update_question_with_answers(
+        cls,
+        instance: Question,
+        answer_options: Optional[list] = None,
+        **question_data
+    ) -> Question:
+
+        for field, value in question_data.items():
+            setattr(instance, field, value)
+
+        instance.save()
+
+        if answer_options is not None:
+            instance.answer_options.all().delete()
+
+            AnswerOption.objects.bulk_create([
+                AnswerOption(
+                    question=instance,
+                    **option
+                )
+                for option in answer_options
+            ])
+
+        return instance
+
+
+class AnswerOptionRepository(BaseRepository[AnswerOption]):
+    model = AnswerOption
+
+    @classmethod
+    def get_user_answers(cls, user):
+        return cls.get_queryset().filter(
+            question__quiz__created_by=user
+        )
+
+    @classmethod
+    def get_queryset(cls):
+        return (
+            cls.model.objects
+            .select_related('question', 'question__quiz')
+        )
+
+    @classmethod
+    def get_question_answers(cls, question_id: int):
+        return cls.get_queryset().filter(question_id=question_id)

@@ -16,6 +16,16 @@ interface QuestionFormType {
   answers: AnswerForm[];
 }
 
+const MIN_QUESTION_LENGTH = 5;
+const MIN_ANSWER_LENGTH = 1;
+
+const MIN_ANSWERS_SINGLE = 2;
+const MIN_ANSWERS_MULTIPLE = 3;
+
+const MAX_REPEATED_CHAR_RATIO = 0.7;
+
+const LETTER_REGEX = /[A-Za-zА-Яа-яЁё]/;
+
 const CreateQuiz: React.FC = () => {
   const navigate = useNavigate();
   const [title, setTitle] = useState('');

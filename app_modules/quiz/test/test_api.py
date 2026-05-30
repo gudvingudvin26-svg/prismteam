@@ -44,7 +44,24 @@ class QuizAPITest(APITestCase):
         cls.client2.force_authenticate(user=cls.user2)
 
         cls.quiz1 = Quiz.objects.create(title="Quiz1", created_by=cls.user1)
-        cls.q1 = Question.objects.create(quiz=cls.quiz1, text="What is Django?", order=1)
+        cls.q1 = Question.objects.create(quiz=cls.quiz1, text="What is Django framework?", order=1)
+        cls.q2 = Question.objects.create(
+            quiz=cls.quiz1,
+            text="What is Python language?",
+            order=2
+        )
+
+        AnswerOption.objects.create(
+            question=cls.q2,
+            text="Programming language",
+            is_correct=True
+        )
+
+        AnswerOption.objects.create(
+            question=cls.q2,
+            text="Database engine",
+            is_correct=False
+        )
         AnswerOption.objects.create(question=cls.q1, text="Web Framework", is_correct=True)
         AnswerOption.objects.create(question=cls.q1, text="Database", is_correct=False)
 
@@ -76,7 +93,7 @@ class QuizAPITest(APITestCase):
         empty_quiz = Quiz.objects.create(title="Empty", created_by=self.user1)
         res = self.client1.post(reverse("quiz-publish", kwargs={"pk": empty_quiz.pk}))
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("хотя бы один вопрос", res.data["detail"])
+        self.assertIn("минимум 2 вопроса", str(res.data["detail"]))
 
     def test_delete_own_quiz(self):
         res = self.client1.delete(reverse("quiz-detail", kwargs={"pk": self.quiz1.pk}))

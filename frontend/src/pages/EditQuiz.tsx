@@ -232,36 +232,27 @@ const EditQuiz: React.FC = () => {
 
     try {
       await quizzesApi.updateQuiz(parseInt(id), {
-        title: title.trim(),
-        description: description.trim(),
-        timer: globalTimer && globalTimer > 0 ? globalTimer : undefined,
+        title,
+        description,
+        timer: globalTimer,
         points_per_question: globalPoints,
       });
 
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
-        const questionData: any = {
-          text: q.text.trim(),
+        const questionData = {
+          text: q.text,
           order: i + 1,
-          question_type: q.question_type,
+          timer: q.timer,
           points: q.points || globalPoints,
-          answer_options: q.answers.map(a => ({
-            text: a.text.trim(),
-            is_correct: a.is_correct
-          }))
+          question_type: q.question_type,
+          answer_options: q.answers.map(a => ({ text: a.text, is_correct: a.is_correct })),
         };
-
-        if (q.timer && q.timer > 0) {
-          questionData.timer = q.timer;
-        }
 
         if (q.id) {
           await quizzesApi.updateQuestion(q.id, questionData);
         } else {
-          await quizzesApi.createQuestion(parseInt(id), {
-            ...questionData,
-            quiz: parseInt(id)
-          });
+          await quizzesApi.createQuestion(parseInt(id), questionData);
         }
       }
 
