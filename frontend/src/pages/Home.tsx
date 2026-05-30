@@ -33,7 +33,7 @@ const Home: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-900 via-purple-700 to-blue-800">
       <header className="sticky top-0 z-10 bg-white/10 backdrop-blur-md py-4 px-6 flex flex-wrap justify-between items-center gap-4 border-b border-white/20">
         <Link to="/" className="text-2xl font-bold text-white drop-shadow-md whitespace-nowrap">
-          Only Quizes Fans
+          Only Quizzes Fans
         </Link>
         <div className="flex gap-3 flex-wrap items-center">
           {isAuthenticated && (

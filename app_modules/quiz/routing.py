@@ -1,3 +1,4 @@
+"""Маршрутизация WebSocket-соединений для квиз-приложения."""
 from django.urls import re_path
 from . import consumers
 

@@ -1,8 +1,15 @@
+"""Сериализаторы для управления сессиями квизов: создание, валидация привязки, контроль полей."""
 from rest_framework import serializers
 from .models import QuizSession
 from app_modules.quiz.models import Quiz
 
 class QuizSessionSerializer(serializers.ModelSerializer):
+    """Сериализатор сессии квиза: поддержка передачи квиза через ID или объект.
+
+    Позволяет принимать quiz_id (write_only) для удобства клиентских запросов,
+    автоматически разрешая его в ForeignKey quiz. Поля code и created_at
+    защищены от перезаписи (read_only).
+    """
     quiz_id = serializers.IntegerField(write_only=True, required=False)
     quiz = serializers.PrimaryKeyRelatedField(queryset=Quiz.objects.all(), required=False)
 
@@ -12,6 +19,21 @@ class QuizSessionSerializer(serializers.ModelSerializer):
         read_only_fields = ['code', 'created_at']
 
     def validate(self, attrs):
+        """Валидация и нормализация связи с квизом: преобразование quiz_id в объект.
+
+        Проверяет наличие quiz_id или quiz. Если передан только quiz_id,
+        загружает соответствующий объект Quiz и подставляет его в attrs.
+        При отсутствии обоих полей выбрасывает ошибку валидации.
+
+        Args:
+            attrs (dict): Входные данные сериализатора.
+
+        Returns:
+            dict: Нормализованные атрибуты с гарантированным полем 'quiz'.
+
+        Raises:
+            serializers.ValidationError: Если quiz_id не найден или оба поля отсутствуют.
+        """
         quiz_id = attrs.get('quiz_id')
         quiz = attrs.get('quiz')
 
