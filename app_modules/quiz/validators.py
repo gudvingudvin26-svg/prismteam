@@ -96,3 +96,15 @@ def validate_unique_answers_per_question(question):
     duplicates = [text for text in texts if texts.count(text) > 1]
     if duplicates:
         raise DjangoValidationError(f"В вопросе обнаружены дублирующиеся ответы: {set(duplicates)}")
+
+def _is_meaningful_text(text):
+    """
+    Проверяет, содержит ли текст осмысленные символы.
+    """
+    if text is None:
+        return False
+
+    if not isinstance(text, str):
+        return False
+
+    return bool(text.strip())

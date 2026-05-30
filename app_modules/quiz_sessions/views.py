@@ -145,7 +145,15 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             from app_modules.quiz.models import Question, AnswerOption
             question = Question.objects.get(id=question_id)
             points_per_question = question.points if question.points else 100
+            existing_answer = ParticipantAnswer.objects.filter(
+                session=session,
+                question=question
+            ).exists()
 
+            if existing_answer:
+                return Response({
+                    'error': 'Ответ уже отправлен'
+                }, status=status.HTTP_400_BAD_REQUEST)
             if question.question_type == 'multiple':
                 selected_answers = AnswerOption.objects.filter(id__in=answer_ids)
                 correct_answers = question.answer_options.filter(is_correct=True)
@@ -200,8 +208,10 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def my_result(self, request, pk=None):
+
         try:
             session = QuizSession.objects.get(id=pk)
+
         except QuizSession.DoesNotExist:
             return Response(
                 {'error': 'Session not found'},
@@ -209,25 +219,18 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            participant_answers = ParticipantAnswer.objects.filter(
-                session=session
-            ).select_related(
-                'question',
-                'answer'
-            )
 
             total_points = 0
-            correct_answers_count = 0
 
-            processed_questions = set()
+            correct_questions = 0
 
-            for participant_answer in participant_answers:
-                question = participant_answer.question
+            questions = session.quiz.questions.prefetch_related(
+                'answer_options'
+            ).all()
 
-                if question.id in processed_questions:
-                    continue
+            detailed_stats = []
 
-                processed_questions.add(question.id)
+            for question in questions:
 
                 correct_option_ids = set(
                     question.answer_options.filter(
@@ -242,87 +245,42 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
                     ).values_list('answer_id', flat=True)
                 )
 
-                is_question_correct = (
+                is_correct = (
                         selected_option_ids == correct_option_ids
                 )
 
-                if is_question_correct:
-                    correct_answers_count += 1
-
-                    total_points += (
-                        question.points
-                        if question.points
-                        else 100
-                    )
-
-            total_questions = session.quiz.questions.count()
-
-            all_sessions = QuizSession.objects.filter(
-                code=session.code,
-                participant_name__isnull=False
-            )
-
-            scores = {}
-
-            for s in all_sessions:
-                s_answers = ParticipantAnswer.objects.filter(
-                    session=s
-                ).select_related(
-                    'question',
-                    'answer'
+                question_points = (
+                    question.points
+                    if question.points
+                    else 100
                 )
 
-                session_points = 0
-                processed_session_questions = set()
+                earned_points = (
+                    question_points
+                    if is_correct
+                    else 0
+                )
 
-                for ans in s_answers:
-                    question = ans.question
+                if is_correct:
+                    correct_questions += 1
+                    total_points += earned_points
 
-                    if question.id in processed_session_questions:
-                        continue
+                detailed_stats.append({
+                    'question_id': question.id,
+                    'question_text': question.text,
+                    'is_correct': is_correct,
+                    'selected_answers': list(selected_option_ids),
+                    'correct_answers': list(correct_option_ids),
+                    'points': earned_points
+                })
 
-                    processed_session_questions.add(question.id)
-
-                    correct_option_ids = set(
-                        question.answer_options.filter(
-                            is_correct=True
-                        ).values_list('id', flat=True)
-                    )
-
-                    selected_option_ids = set(
-                        ParticipantAnswer.objects.filter(
-                            session=s,
-                            question=question
-                        ).values_list('answer_id', flat=True)
-                    )
-
-                    if selected_option_ids == correct_option_ids:
-                        session_points += (
-                            question.points
-                            if question.points
-                            else 100
-                        )
-
-                scores[s.participant_name] = session_points
-
-            sorted_scores = sorted(
-                scores.items(),
-                key=lambda x: x[1],
-                reverse=True
-            )
-
-            rank = 1
-
-            for i, (name, points) in enumerate(sorted_scores):
-                if name == session.participant_name:
-                    rank = i + 1
-                    break
+            total_questions = questions.count()
 
             return Response({
                 'score': total_points,
                 'total_questions': total_questions,
-                'correct_answers': correct_answers_count,
-                'rank': rank
+                'correct_answers': correct_questions,
+                'details': detailed_stats
             })
 
         except Exception as e:
@@ -436,7 +394,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
                 selected_option_ids = set(
                     selected_answers.values_list(
-                        'answer__id',
+                        'answer_id',
                         flat=True
                     )
                 )
@@ -481,7 +439,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
                 print(f"Player session: question index {question_index}, total questions: {len(questions_list)}")
 
-                if question_index >= len(questions_list):
+                if question_index >= len(questions_list) or len(questions_list) == 0:
                     session.status = 'completed'
                     session.ended_at = timezone.now()
                     session.save()
@@ -527,7 +485,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
             print(f"Creator session: question index {question_index}, total questions: {len(questions_list)}")
 
-            if question_index >= len(questions_list):
+            if question_index >= len(questions_list) or len(questions_list) == 0:
                 session.status = 'completed'
                 session.ended_at = timezone.now()
                 session.save()
