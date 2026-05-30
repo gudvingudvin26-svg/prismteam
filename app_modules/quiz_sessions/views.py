@@ -145,15 +145,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
             from app_modules.quiz.models import Question, AnswerOption
             question = Question.objects.get(id=question_id)
             points_per_question = question.points if question.points else 100
-            existing_answer = ParticipantAnswer.objects.filter(
-                session=session,
-                question=question
-            ).exists()
 
-            if existing_answer:
-                return Response({
-                    'error': 'Ответ уже отправлен'
-                }, status=status.HTTP_400_BAD_REQUEST)
             if question.question_type == 'multiple':
                 selected_answers = AnswerOption.objects.filter(id__in=answer_ids)
                 correct_answers = question.answer_options.filter(is_correct=True)
@@ -208,86 +200,82 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def my_result(self, request, pk=None):
-
         try:
             session = QuizSession.objects.get(id=pk)
-
         except QuizSession.DoesNotExist:
-            return Response(
-                {'error': 'Session not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-
+            answers = ParticipantAnswer.objects.filter(session=session)
             total_points = 0
+            correct_answers_count = 0
 
-            correct_questions = 0
+            for ans in answers:
+                if ans.is_correct:
+                    correct_answers_count += 1
+                    question = ans.question
+                    points_per_question = question.points if question.points else 100
 
-            questions = session.quiz.questions.prefetch_related(
-                'answer_options'
-            ).all()
+                    if question.question_type == 'multiple':
+                        correct_answers_for_question = question.answer_options.filter(is_correct=True).count()
+                        user_correct_for_question = ParticipantAnswer.objects.filter(
+                            session=session,
+                            question=question,
+                            is_correct=True
+                        ).count()
 
-            detailed_stats = []
+                        if correct_answers_for_question > 0:
+                            points_per_correct = points_per_question / correct_answers_for_question
+                            total_points += int(points_per_correct * user_correct_for_question)
+                    else:
+                        total_points += points_per_question
 
-            for question in questions:
+            total_questions = session.quiz.questions.count()
 
-                correct_option_ids = set(
-                    question.answer_options.filter(
-                        is_correct=True
-                    ).values_list('id', flat=True)
-                )
+            all_sessions = QuizSession.objects.filter(
+                code=session.code,
+                participant_name__isnull=False
+            )
+            scores = {}
+            for s in all_sessions:
+                points = 0
+                s_answers = ParticipantAnswer.objects.filter(session=s)
+                for ans in s_answers:
+                    if ans.is_correct:
+                        q = ans.question
+                        q_points = q.points if q.points else 100
 
-                selected_option_ids = set(
-                    ParticipantAnswer.objects.filter(
-                        session=session,
-                        question=question
-                    ).values_list('answer_id', flat=True)
-                )
+                        if q.question_type == 'multiple':
+                            correct_count = q.answer_options.filter(is_correct=True).count()
+                            user_correct = ParticipantAnswer.objects.filter(session=s, question=q,
+                                                                            is_correct=True).count()
+                            if correct_count > 0:
+                                points += int((q_points / correct_count) * user_correct)
+                        else:
+                            points += q_points
 
-                is_correct = (
-                        selected_option_ids == correct_option_ids
-                )
+                name = s.participant_name if s.participant_name else (
+                    s.quiz.created_by.username if s.quiz.created_by else "Организатор")
+                scores[name] = points
 
-                question_points = (
-                    question.points
-                    if question.points
-                    else 100
-                )
+            sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+            current_name = session.participant_name if session.participant_name else (
+                session.quiz.created_by.username if session.quiz.created_by else "Организатор")
 
-                earned_points = (
-                    question_points
-                    if is_correct
-                    else 0
-                )
-
-                if is_correct:
-                    correct_questions += 1
-                    total_points += earned_points
-
-                detailed_stats.append({
-                    'question_id': question.id,
-                    'question_text': question.text,
-                    'is_correct': is_correct,
-                    'selected_answers': list(selected_option_ids),
-                    'correct_answers': list(correct_option_ids),
-                    'points': earned_points
-                })
-
-            total_questions = questions.count()
+            rank = 1
+            for i, (name, points) in enumerate(sorted_scores):
+                if name == current_name:
+                    rank = i + 1
+                    break
 
             return Response({
                 'score': total_points,
                 'total_questions': total_questions,
-                'correct_answers': correct_questions,
-                'details': detailed_stats
+                'correct_answers': correct_answers_count,
+                'rank': rank
             })
-
         except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def results(self, request, pk=None):
@@ -348,80 +336,32 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny()])
     def questions_stats(self, request, pk=None):
-
         try:
-            session = QuizSession.objects.select_related(
-                'quiz'
-            ).get(id=pk)
-
+            session = QuizSession.objects.get(id=pk)
         except QuizSession.DoesNotExist:
             return Response([])
 
-        questions = session.quiz.questions.prefetch_related(
-            'answer_options'
-        ).all()
+        try:
+            questions = session.quiz.questions.all()
+            stats = []
+            related_sessions = QuizSession.objects.filter(code=session.code)
 
-        completed_sessions = QuizSession.objects.filter(
-            code=session.code,
-            status='completed'
-        ).exclude(
-            participant_name__isnull=True
-        ).exclude(
-            participant_name=''
-        )
+            for q in questions:
+                total_answers = ParticipantAnswer.objects.filter(session__in=related_sessions, question=q).count()
+                correct_count = ParticipantAnswer.objects.filter(session__in=related_sessions, question=q,
+                                                                 is_correct=True).count()
+                correct_percent = int((correct_count / total_answers * 100)) if total_answers > 0 else 0
 
-        result = []
-
-        for question in questions:
-
-            correct_option_ids = set(
-                question.answer_options.filter(
-                    is_correct=True
-                ).values_list('id', flat=True)
-            )
-
-            total_answers = 0
-            correct_count = 0
-
-            for participant_session in completed_sessions:
-
-                selected_answers = ParticipantAnswer.objects.filter(
-                    session=participant_session,
-                    question=question
-                ).exclude(
-                    answer__isnull=True
-                )
-
-                selected_option_ids = set(
-                    selected_answers.values_list(
-                        'answer_id',
-                        flat=True
-                    )
-                )
-
-                if not selected_option_ids:
-                    continue
-
-                total_answers += 1
-
-                if selected_option_ids == correct_option_ids:
-                    correct_count += 1
-
-            correct_percent = (
-                round((correct_count / total_answers) * 100)
-                if total_answers > 0
-                else 0
-            )
-
-            result.append({
-                'question_id': question.id,
-                'question_text': question.text,
-                'total_answers': total_answers,
-                'correct_count': correct_count,
-                'correct_percent': correct_percent
-            })
-
-        return Response(result)
+                stats.append({
+                    'question_id': q.id,
+                    'question_text': q.text,
+                    'total_answers': total_answers,
+                    'correct_count': correct_count,
+                    'correct_percent': correct_percent
+                })
+            return Response(stats)
+        except Exception:
+            return Response([])
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -439,7 +379,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
                 print(f"Player session: question index {question_index}, total questions: {len(questions_list)}")
 
-                if question_index >= len(questions_list) or len(questions_list) == 0:
+                if question_index >= len(questions_list):
                     session.status = 'completed'
                     session.ended_at = timezone.now()
                     session.save()
@@ -485,7 +425,7 @@ class QuizSessionViewSet(viewsets.ModelViewSet):
 
             print(f"Creator session: question index {question_index}, total questions: {len(questions_list)}")
 
-            if question_index >= len(questions_list) or len(questions_list) == 0:
+            if question_index >= len(questions_list):
                 session.status = 'completed'
                 session.ended_at = timezone.now()
                 session.save()
