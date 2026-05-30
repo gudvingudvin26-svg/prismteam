@@ -81,9 +81,9 @@ class QuestionSerializer(serializers.ModelSerializer):
 
         options = data.get('answer_options')
 
-        question_type = data.get(
-            'question_type',
-            instance.question_type if instance else None
+        question_type = (
+                data.get('question_type')
+                or self.instance.question_type
         )
 
         if options is not None:
@@ -107,9 +107,11 @@ class QuestionSerializer(serializers.ModelSerializer):
 
         return question
 
-
     def update(self, instance, validated_data):
-        options_data = validated_data.pop('answer_options', None)
+        options_data = validated_data.pop(
+            'answer_options',
+            None
+        )
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -120,7 +122,10 @@ class QuestionSerializer(serializers.ModelSerializer):
             instance.answer_options.all().delete()
 
             AnswerOption.objects.bulk_create([
-                AnswerOption(question=instance, **opt)
+                AnswerOption(
+                    question=instance,
+                    **opt
+                )
                 for opt in options_data
             ])
 

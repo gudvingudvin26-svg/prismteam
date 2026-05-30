@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 
-def validate_answer_options_data(options_data, use_drf_exception=True, text_field='text', min_length=1):
+def validate_answer_options_data(options_data, use_drf_exception=True, text_field='text', min_length=1, question_type=None):
     """
     Валидация списка вариантов ответа: тип, количество, уникальность, длина текста.
 

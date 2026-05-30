@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta
 
 from django.contrib.auth import logout, login
 from django.db.models import Prefetch
@@ -8,18 +9,16 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from .models import User, Quiz, Question, AnswerOption
 from .serializers import UserSerializer, QuizSerializer, QuestionSerializer, AnswerOptionSerializer
 from .validators import validate_quiz_integrity
 from .factories import QuizFactory
-from .repositories import (
-    QuizRepository,
-    QuestionRepository,
-    AnswerOptionRepository
-)
+from .repositories import *
+from .authentication import CookieJWTAuthentication
+
 login_log = logging.getLogger('login_log')
 quiz_log = logging.getLogger('quiz_log')
 
@@ -192,6 +191,8 @@ class Main(APIView):
 
 
 class UserLogout(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request):
         username = request.user.username if request.user.is_authenticated else 'Аноним'
         user_id = request.user.id if request.user.is_authenticated else None
@@ -208,6 +209,7 @@ class UserLogout(APIView):
         response.delete_cookie('refresh_token', path='/')
         response.delete_cookie('csrftoken', path='/')
         response.delete_cookie('sessionid', path='/')
+        response['Access-Control-Allow-Credentials'] = 'true'
         return response
 
     def get(self, request):
@@ -218,6 +220,7 @@ class UserLogout(APIView):
         response.delete_cookie('refresh_token', path='/')
         response.delete_cookie('csrftoken', path='/')
         response.delete_cookie('sessionid', path='/')
+        response['Access-Control-Allow-Credentials'] = 'true'
         return response
 
 
@@ -416,25 +419,35 @@ class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
     throttle_classes = [UserRateThrottle]
-
     def get_queryset(self):
-        return QuizRepository.get_user_quizzes(
-            self.request.user
-        )
-
+        user = self.request.user
+        return Quiz.objects.filter(
+            created_by=user
+        ).prefetch_related(
+            Prefetch(
+                'questions',
+                queryset=Question.objects.select_related('quiz').prefetch_related('answer_options')
+            )
+        ).select_related('created_by').order_by('-id')
     def retrieve(self, request, *args, **kwargs):
-        quiz = QuizRepository.get_user_quiz_by_id(
-            request.user,
-            kwargs.get('pk')
-        )
-        if not quiz:
+        try:
+            quiz = self.get_object()
+            if quiz.created_by != request.user:
+                quiz_log.warning(
+                    f"Отказано в доступе к квизу {kwargs.get('pk')} для пользователя {request.user.id}",
+                    extra={'quiz_id': kwargs.get('pk'), 'user_id': request.user.id}
+                )
+                return Response(
+                    {"detail": "У вас нет доступа к этому квизу"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            serializer = self.get_serializer(quiz)
+            return Response(serializer.data)
+        except Quiz.DoesNotExist:
             return Response(
                 {"detail": "Квиз не найден"},
                 status=status.HTTP_404_NOT_FOUND
             )
-        serializer = self.get_serializer(quiz)
-        return Response(serializer.data)
-
     def create(self, request, *args, **kwargs):
         try:
             quiz_log.info(
@@ -483,7 +496,7 @@ class QuizViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 quiz_log.warning(f"Ошибка при удалении сессий: {e}")
 
-            QuizRepository.delete(quiz)
+            quiz.delete()
             quiz_log.info(f"Квиз {quiz_id} успешно удален")
 
             return Response(
@@ -500,35 +513,19 @@ class QuizViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def publish(self, request, pk=None):
-        quiz = QuizRepository.get_user_quiz_by_id(
-            request.user,
-            pk
-        )
-
-        if not quiz:
-            return Response(
-                {"detail": "Квиз не найден"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
+        quiz = self.get_object()
         try:
-            QuizRepository.publish_quiz(quiz)
-
+            validate_quiz_integrity(quiz, use_drf_exception=True)
             quiz_log.info(
                 f"Квиз {pk} опубликован",
                 extra={'quiz_id': pk, 'user_id': request.user.id}
             )
-
             return Response(
                 {"status": "Квиз успешно прошел валидацию и готов к публикации."},
                 status=status.HTTP_200_OK
             )
-
         except ValidationError as e:
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     def perform_create(self, serializer):
         quiz = QuizFactory.create_quiz(serializer.validated_data, self.request.user)
         serializer.instance = quiz
@@ -538,7 +535,6 @@ class QuestionViewSet(viewsets.ModelViewSet):
     serializer_class = QuestionSerializer
     permission_classes = [permissions.IsAuthenticated]
     throttle_classes = [UserRateThrottle]
-
     def get_queryset(self):
         return QuestionRepository.get_queryset().filter(
             quiz__created_by=self.request.user
@@ -549,7 +545,6 @@ class AnswerOptionViewSet(viewsets.ModelViewSet):
     serializer_class = AnswerOptionSerializer
     permission_classes = [permissions.IsAuthenticated]
     throttle_classes = [UserRateThrottle]
-
     def get_queryset(self):
         return AnswerOptionRepository.get_user_answers(
             self.request.user
